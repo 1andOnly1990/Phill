@@ -19,6 +19,7 @@ import com.phillips.phill.ui.customers.CustomerDetailScreen
 import com.phillips.phill.ui.customers.CustomerFormScreen
 import com.phillips.phill.ui.customers.CustomerListScreen
 import com.phillips.phill.ui.customers.VehicleFormScreen
+import com.phillips.phill.ui.dashboard.DashboardScreen
 import com.phillips.phill.ui.jobs.JobDetailScreen
 import com.phillips.phill.ui.jobs.JobQueueScreen
 import com.phillips.phill.ui.schedule.AppointmentFormScreen
@@ -53,7 +54,7 @@ fun PhillNavGraph() {
             entryProvider = entryProvider {
                 // --- Bottom bar tabs ---
                 entry<DashboardKey> {
-                    PlaceholderScreen("Dashboard")
+                    DashboardScreen()
                 }
                 entry<ScheduleKey> {
                     ScheduleScreen(
