@@ -14,6 +14,8 @@ import androidx.navigation3.ui.NavDisplay
 import com.phillips.phill.ui.billing.ExpenseFormScreen
 import com.phillips.phill.ui.billing.InvoiceBuilderScreen
 import com.phillips.phill.ui.billing.InvoiceDetailScreen
+import com.phillips.phill.ui.comms.ConversationDetailScreen
+import com.phillips.phill.ui.comms.ConversationListScreen
 import com.phillips.phill.ui.components.PhillBottomBar
 import com.phillips.phill.ui.customers.CustomerDetailScreen
 import com.phillips.phill.ui.customers.CustomerFormScreen
@@ -68,7 +70,9 @@ fun PhillNavGraph() {
                     )
                 }
                 entry<CommsKey> {
-                    PlaceholderScreen("Communications")
+                    ConversationListScreen(
+                        onConversationClick = { convoId -> backStack.add(ConversationKey(convoId)) }
+                    )
                 }
 
                 // --- "More" menu screens ---
@@ -155,7 +159,9 @@ fun PhillNavGraph() {
                     )
                 }
                 entry<ConversationKey> { key ->
-                    PlaceholderScreen("Conversation: ${key.conversationId}")
+                    ConversationDetailScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() }
+                    )
                 }
                 entry<ExpenseFormKey> { key ->
                     ExpenseFormScreen(

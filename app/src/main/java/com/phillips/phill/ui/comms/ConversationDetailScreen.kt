@@ -1,0 +1,208 @@
+package com.phillips.phill.ui.comms
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.phillips.phill.data.entity.MessageEntity
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConversationDetailScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: ConversationDetailViewModel = hiltViewModel()
+) {
+    val state by viewModel.uiState.collectAsState()
+    val conversation = state.conversation
+    val listState = rememberLazyListState()
+
+    // Scroll to bottom when new messages arrive
+    LaunchedEffect(state.messages.size) {
+        if (state.messages.isNotEmpty()) {
+            listState.animateScrollToItem(state.messages.size - 1)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(conversation?.displayName ?: conversation?.phoneNumber ?: "Chat")
+                        conversation?.phoneNumber?.let {
+                            if (conversation.displayName != null) {
+                                Text(it, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        },
+        bottomBar = {
+            // Compose bar — HITL Rule 1: operator types and taps Send
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = state.draftMessage,
+                    onValueChange = viewModel::updateDraft,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Type a message…") },
+                    maxLines = 3,
+                    shape = RoundedCornerShape(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = { viewModel.sendMessage() },
+                    enabled = state.draftMessage.isNotBlank() && !state.isSending
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = if (state.draftMessage.isNotBlank())
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Error bar
+            state.sendError?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(8.dp)
+                )
+            }
+
+            // Messages
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(state.messages, key = { it.id }) { message ->
+                    MessageBubble(message = message)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageBubble(message: MessageEntity) {
+    val isOutbound = !message.isInbound
+    val bubbleColor = if (isOutbound)
+        MaterialTheme.colorScheme.primary
+    else
+        MaterialTheme.colorScheme.surfaceVariant
+    val textColor = if (isOutbound)
+        MaterialTheme.colorScheme.onPrimary
+    else
+        MaterialTheme.colorScheme.onSurfaceVariant
+
+    val timeFormatter = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+    val timeText = Instant.ofEpochMilli(message.timestampEpoch)
+        .atZone(ZoneId.systemDefault())
+        .toLocalTime()
+        .format(timeFormatter)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isOutbound) Arrangement.End else Arrangement.Start
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 280.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = if (isOutbound) 16.dp else 4.dp,
+                        bottomEnd = if (isOutbound) 4.dp else 16.dp
+                    )
+                )
+                .background(bubbleColor)
+                .padding(12.dp)
+        ) {
+            Column {
+                Text(
+                    text = message.body,
+                    color = textColor,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = timeText,
+                    color = textColor.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.align(Alignment.End)
+                )
+            }
+        }
+    }
+}
