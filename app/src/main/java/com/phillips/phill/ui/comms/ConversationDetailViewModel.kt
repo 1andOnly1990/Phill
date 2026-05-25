@@ -18,8 +18,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import com.phillips.phill.data.entity.CustomerEntity
+import com.phillips.phill.data.repository.CustomerRepository
+import com.phillips.phill.data.repository.JobRepository
+import com.phillips.phill.domain.enums.JobStatus
+import com.phillips.phill.sms.SmsSyncManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.withContext
+
 data class ConversationDetailUiState(
     val conversation: ConversationEntity? = null,
+    val customer: CustomerEntity? = null,
+    val activeJobsCount: Int = 0,
+    val outstandingBalance: Long = 0L,
     val messages: List<MessageEntity> = emptyList(),
     val draftMessage: String = "",
     val isSending: Boolean = false,
@@ -31,6 +43,9 @@ data class ConversationDetailUiState(
 class ConversationDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val commsRepository: CommsRepository,
+    private val customerRepository: CustomerRepository,
+    private val jobRepository: JobRepository,
+    private val smsSyncManager: SmsSyncManager,
     private val application: Application
 ) : ViewModel() {
 
@@ -51,21 +66,57 @@ class ConversationDetailViewModel @Inject constructor(
                 return@launch
             }
 
+            // Trigger background sync with device SMS
+            launch {
+                try {
+                    smsSyncManager.syncConversation(conversationId)
+                } catch (e: Exception) {
+                    // Ignore for now if no permission
+                }
+            }
+
             // Mark as read
             if (conversation.unreadCount > 0) {
                 commsRepository.saveConversation(conversation.copy(unreadCount = 0))
             }
 
-            // Observe messages reactively
-            commsRepository.observeMessages(conversationId)
-                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-                .collect { messages ->
+            // Observe relational data if a customer is linked
+            val customerId = conversation.customerId
+            if (customerId != null) {
+                // Combine messages, customer, and jobs flows
+                val customer = customerRepository.getCustomerById(customerId)
+                combine(
+                    commsRepository.observeMessages(conversationId),
+                    jobRepository.observeByCustomer(customerId)
+                ) { messages, jobs ->
+                    val activeCount = jobs.count { it.status == JobStatus.IN_PROGRESS || it.status == JobStatus.SCHEDULED }
                     _uiState.value = _uiState.value.copy(
                         conversation = conversation,
+                        customer = customer,
+                        activeJobsCount = activeCount,
                         messages = messages,
                         isLoading = false
                     )
+                }.stateIn(viewModelScope, SharingStarted.Eagerly, Unit)
+            } else {
+                // Try linking if phone number matches a customer
+                val customer = customerRepository.getCustomerByPhone(conversation.phoneNumber)
+                if (customer != null) {
+                    commsRepository.saveConversation(conversation.copy(customerId = customer.id))
+                    // Re-load will be triggered implicitly or next time, but let's just do a basic load for now
                 }
+                
+                commsRepository.observeMessages(conversationId)
+                    .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+                    .collect { messages ->
+                        _uiState.value = _uiState.value.copy(
+                            conversation = conversation,
+                            customer = customer,
+                            messages = messages,
+                            isLoading = false
+                        )
+                    }
+            }
         }
     }
 

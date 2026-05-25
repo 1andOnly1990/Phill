@@ -32,8 +32,9 @@ class CustomerFormViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val customerId: String? = savedStateHandle.get<String>("customerId")
+    private val initialPhone: String? = savedStateHandle.get<String>("initialPhone")
 
-    private val _uiState = MutableStateFlow(CustomerFormUiState())
+    private val _uiState = MutableStateFlow(CustomerFormUiState(phoneNumber = initialPhone ?: ""))
     val uiState: StateFlow<CustomerFormUiState> = _uiState.asStateFlow()
 
     private var existingCustomer: CustomerEntity? = null

@@ -14,6 +14,9 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE conversation_id = :conversationId ORDER BY timestamp_epoch ASC")
     fun observeByConversation(conversationId: String): Flow<List<MessageEntity>>
 
+    @Query("SELECT * FROM messages WHERE conversation_id = :conversationId ORDER BY timestamp_epoch ASC")
+    suspend fun getByConversationId(conversationId: String): List<MessageEntity>
+
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getById(id: String): MessageEntity?
 

@@ -33,6 +33,9 @@ class CommsRepository @Inject constructor(
     fun observeMessages(conversationId: String): Flow<List<MessageEntity>> =
         messageDao.observeByConversation(conversationId)
 
+    suspend fun getMessagesByConversationIdSync(conversationId: String): List<MessageEntity> =
+        messageDao.getByConversationId(conversationId)
+
     suspend fun saveMessage(message: MessageEntity) {
         val existing = messageDao.getById(message.id)
         if (existing != null) messageDao.update(message) else messageDao.insert(message)

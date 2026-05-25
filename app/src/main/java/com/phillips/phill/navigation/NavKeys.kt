@@ -17,9 +17,9 @@ import kotlinx.serialization.Serializable
 
 // --- Detail destinations (Phase 3+) ---
 @Serializable data class CustomerDetailKey(val customerId: String) : NavKey
-@Serializable data class CustomerFormKey(val customerId: String? = null) : NavKey
+@Serializable data class CustomerFormKey(val customerId: String? = null, val initialPhone: String? = null) : NavKey
 @Serializable data class VehicleFormKey(val customerId: String, val vehicleId: String? = null) : NavKey
-@Serializable data class AppointmentFormKey(val appointmentId: String? = null) : NavKey
+@Serializable data class AppointmentFormKey(val appointmentId: String? = null, val initialCustomerId: String? = null) : NavKey
 @Serializable data class JobDetailKey(val jobId: String) : NavKey
 @Serializable data class InvoiceBuilderKey(val jobId: String, val invoiceId: String? = null) : NavKey
 @Serializable data class InvoiceDetailKey(val invoiceId: String) : NavKey

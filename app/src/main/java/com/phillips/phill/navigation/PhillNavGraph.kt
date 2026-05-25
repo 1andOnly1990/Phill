@@ -160,7 +160,9 @@ fun PhillNavGraph() {
                 }
                 entry<ConversationKey> { key ->
                     ConversationDetailScreen(
-                        onNavigateBack = { backStack.removeLastOrNull() }
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onCreateCustomer = { phone -> backStack.add(CustomerFormKey(initialPhone = phone)) },
+                        onScheduleAppointment = { customerId -> backStack.add(AppointmentFormKey(initialCustomerId = customerId)) }
                     )
                 }
                 entry<ExpenseFormKey> { key ->

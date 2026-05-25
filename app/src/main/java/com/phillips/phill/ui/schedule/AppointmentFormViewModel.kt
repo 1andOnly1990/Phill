@@ -47,6 +47,7 @@ class AppointmentFormViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val appointmentId: String? = savedStateHandle.get<String>("appointmentId")
+    private val initialCustomerId: String? = savedStateHandle.get<String>("initialCustomerId")
 
     private val _uiState = MutableStateFlow(AppointmentFormUiState())
     val uiState: StateFlow<AppointmentFormUiState> = _uiState.asStateFlow()
@@ -56,6 +57,17 @@ class AppointmentFormViewModel @Inject constructor(
     init {
         if (appointmentId != null) {
             loadExisting(appointmentId)
+        } else if (initialCustomerId != null) {
+            preselectCustomer(initialCustomerId)
+        }
+    }
+
+    private fun preselectCustomer(customerId: String) {
+        viewModelScope.launch {
+            val customer = customerRepository.getCustomerById(customerId)
+            if (customer != null) {
+                selectCustomer(customer)
+            }
         }
     }
 

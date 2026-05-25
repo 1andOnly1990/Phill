@@ -44,14 +44,27 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Surface
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationDetailScreen(
     onNavigateBack: () -> Unit,
+    onCreateCustomer: (String) -> Unit,
+    onScheduleAppointment: (String) -> Unit,
     viewModel: ConversationDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val conversation = state.conversation
+    val customer = state.customer
     val listState = rememberLazyListState()
 
     // Scroll to bottom when new messages arrive
@@ -123,6 +136,61 @@ fun ConversationDetailScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Context Header
+            if (conversation != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        if (customer == null) {
+                            Text(
+                                text = "Unknown Lead",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = { onCreateCustomer(conversation.phoneNumber) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.PersonAdd, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Create Customer")
+                            }
+                        } else {
+                            Text(
+                                text = "${customer.firstName} ${customer.lastName}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Active Jobs: ${state.activeJobsCount}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { onScheduleAppointment(customer.id) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Filled.Event, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("New Appt", maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Error bar
             state.sendError?.let { error ->
                 Text(
