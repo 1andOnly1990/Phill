@@ -12,6 +12,10 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.phillips.phill.ui.components.PhillBottomBar
+import com.phillips.phill.ui.customers.CustomerDetailScreen
+import com.phillips.phill.ui.customers.CustomerFormScreen
+import com.phillips.phill.ui.customers.CustomerListScreen
+import com.phillips.phill.ui.customers.VehicleFormScreen
 import com.phillips.phill.ui.settings.ShopSettingsScreen
 
 @Composable
@@ -56,7 +60,15 @@ fun PhillNavGraph() {
 
                 // --- "More" menu screens ---
                 entry<CustomerListKey> {
-                    PlaceholderScreen("Customers")
+                    CustomerListScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onCustomerClick = { customerId ->
+                            backStack.add(CustomerDetailKey(customerId))
+                        },
+                        onAddCustomer = {
+                            backStack.add(CustomerFormKey())
+                        }
+                    )
                 }
                 entry<BillingKey> {
                     PlaceholderScreen("Billing")
@@ -70,15 +82,40 @@ fun PhillNavGraph() {
                     )
                 }
 
-                // --- Detail screens (placeholders until respective phases) ---
+                // --- Detail screens ---
                 entry<CustomerDetailKey> { key ->
-                    PlaceholderScreen("Customer Detail: ${key.customerId}")
+                    CustomerDetailScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onEditCustomer = { customerId ->
+                            backStack.add(CustomerFormKey(customerId))
+                        },
+                        onAddVehicle = { customerId ->
+                            backStack.add(VehicleFormKey(customerId))
+                        },
+                        onEditVehicle = { customerId, vehicleId ->
+                            backStack.add(VehicleFormKey(customerId, vehicleId))
+                        },
+                        onViewJobs = { /* Phase 5 */ },
+                        onViewInvoices = { /* Phase 6 */ }
+                    )
                 }
                 entry<CustomerFormKey> { key ->
-                    PlaceholderScreen("Customer Form: ${key.customerId ?: "New"}")
+                    CustomerFormScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onSaveSuccess = { customerId ->
+                            // Pop form and navigate to detail
+                            backStack.removeLastOrNull()
+                            backStack.add(CustomerDetailKey(customerId))
+                        }
+                    )
                 }
                 entry<VehicleFormKey> { key ->
-                    PlaceholderScreen("Vehicle Form: ${key.vehicleId ?: "New"}")
+                    VehicleFormScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onSaveSuccess = {
+                            backStack.removeLastOrNull()
+                        }
+                    )
                 }
                 entry<AppointmentFormKey> { key ->
                     PlaceholderScreen("Appointment Form: ${key.appointmentId ?: "New"}")
