@@ -16,6 +16,8 @@ import com.phillips.phill.ui.customers.CustomerDetailScreen
 import com.phillips.phill.ui.customers.CustomerFormScreen
 import com.phillips.phill.ui.customers.CustomerListScreen
 import com.phillips.phill.ui.customers.VehicleFormScreen
+import com.phillips.phill.ui.jobs.JobDetailScreen
+import com.phillips.phill.ui.jobs.JobQueueScreen
 import com.phillips.phill.ui.schedule.AppointmentFormScreen
 import com.phillips.phill.ui.schedule.ScheduleScreen
 import com.phillips.phill.ui.settings.ShopSettingsScreen
@@ -57,7 +59,9 @@ fun PhillNavGraph() {
                     )
                 }
                 entry<JobQueueKey> {
-                    PlaceholderScreen("Jobs")
+                    JobQueueScreen(
+                        onJobClick = { jobId -> backStack.add(JobDetailKey(jobId)) }
+                    )
                 }
                 entry<CommsKey> {
                     PlaceholderScreen("Communications")
@@ -129,7 +133,11 @@ fun PhillNavGraph() {
                     )
                 }
                 entry<JobDetailKey> { key ->
-                    PlaceholderScreen("Job Detail: ${key.jobId}")
+                    JobDetailScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onNavigateToInvoice = { id -> backStack.add(InvoiceBuilderKey(key.jobId, id)) },
+                        onNavigateToCustomer = { customerId -> backStack.add(CustomerDetailKey(customerId)) }
+                    )
                 }
                 entry<InvoiceBuilderKey> { key ->
                     PlaceholderScreen("Invoice Builder: ${key.invoiceId ?: "New"}")
