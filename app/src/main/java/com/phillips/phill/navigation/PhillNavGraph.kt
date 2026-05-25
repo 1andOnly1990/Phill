@@ -11,6 +11,9 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.phillips.phill.ui.billing.ExpenseFormScreen
+import com.phillips.phill.ui.billing.InvoiceBuilderScreen
+import com.phillips.phill.ui.billing.InvoiceDetailScreen
 import com.phillips.phill.ui.components.PhillBottomBar
 import com.phillips.phill.ui.customers.CustomerDetailScreen
 import com.phillips.phill.ui.customers.CustomerFormScreen
@@ -140,16 +143,24 @@ fun PhillNavGraph() {
                     )
                 }
                 entry<InvoiceBuilderKey> { key ->
-                    PlaceholderScreen("Invoice Builder: ${key.invoiceId ?: "New"}")
+                    InvoiceBuilderScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onSaveSuccess = { backStack.removeLastOrNull() }
+                    )
                 }
                 entry<InvoiceDetailKey> { key ->
-                    PlaceholderScreen("Invoice Detail: ${key.invoiceId}")
+                    InvoiceDetailScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() }
+                    )
                 }
                 entry<ConversationKey> { key ->
                     PlaceholderScreen("Conversation: ${key.conversationId}")
                 }
                 entry<ExpenseFormKey> { key ->
-                    PlaceholderScreen("Expense Form: ${key.expenseId ?: "New"}")
+                    ExpenseFormScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onSaveSuccess = { backStack.removeLastOrNull() }
+                    )
                 }
                 entry<PaymentLogKey> {
                     PlaceholderScreen("Payment Log")
