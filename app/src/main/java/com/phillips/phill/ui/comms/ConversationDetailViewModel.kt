@@ -89,7 +89,7 @@ class ConversationDetailViewModel @Inject constructor(
                     commsRepository.observeMessages(conversationId),
                     jobRepository.observeByCustomer(customerId)
                 ) { messages, jobs ->
-                    val activeCount = jobs.count { it.status == JobStatus.IN_PROGRESS || it.status == JobStatus.SCHEDULED }
+                    val activeCount = jobs.count { it.status == JobStatus.EN_ROUTE || it.status == JobStatus.ON_SITE || it.status == JobStatus.SCHEDULED }
                     _uiState.value = _uiState.value.copy(
                         conversation = conversation,
                         customer = customer,
