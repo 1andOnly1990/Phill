@@ -12,6 +12,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.phillips.phill.ui.components.PhillBottomBar
+import com.phillips.phill.ui.settings.ShopSettingsScreen
 
 @Composable
 fun PhillNavGraph() {
@@ -64,7 +65,9 @@ fun PhillNavGraph() {
                     PlaceholderScreen("Analytics")
                 }
                 entry<ShopSettingsKey> {
-                    PlaceholderScreen("Shop Settings")
+                    ShopSettingsScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() }
+                    )
                 }
 
                 // --- Detail screens (placeholders until respective phases) ---
