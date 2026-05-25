@@ -311,7 +311,7 @@ fun JobDetailScreen(
                 }
             } else {
                 OutlinedButton(
-                    onClick = { onNavigateToInvoice(jobId) },
+                    onClick = { onNavigateToInvoice(job.id) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Filled.Receipt, contentDescription = null)
