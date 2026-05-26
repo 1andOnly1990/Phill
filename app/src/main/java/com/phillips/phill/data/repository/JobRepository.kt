@@ -41,6 +41,8 @@ class JobRepository @Inject constructor(
     suspend fun deleteJob(job: JobEntity) = jobDao.delete(job)
 
     // Clock operations scoped to job
+    fun observeAllClockEntries(): Flow<List<ClockEntryEntity>> = clockEntryDao.observeAll()
+
     fun observeClockEntries(jobId: String): Flow<List<ClockEntryEntity>> =
         clockEntryDao.observeByJob(jobId)
 

@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ClockEntryDao {
+    @Query("SELECT * FROM clock_entries ORDER BY clock_in_epoch DESC")
+    fun observeAll(): Flow<List<ClockEntryEntity>>
+
     @Query("SELECT * FROM clock_entries WHERE job_id = :jobId ORDER BY clock_in_epoch DESC")
     fun observeByJob(jobId: String): Flow<List<ClockEntryEntity>>
 

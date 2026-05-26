@@ -1,5 +1,6 @@
 package com.phillips.phill.ui.jobs
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -108,7 +109,7 @@ fun JobDetailScreen(
                             "${c.firstName} ${c.lastName}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickableText { onNavigateToCustomer(c.id) }
+                            modifier = Modifier.clickable { onNavigateToCustomer(c.id) }
                         )
                         Text(c.phoneNumber, style = MaterialTheme.typography.bodyMedium)
                         c.address?.let {
@@ -374,10 +375,6 @@ private fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vect
         )
     }
 }
-
-/** Extension to make text clickable */
-private fun Modifier.clickableText(onClick: () -> Unit): Modifier =
-    this.then(Modifier)  // No-op; use Modifier.clickable directly on the composable instead
 
 private fun formatElapsed(totalSeconds: Long): String {
     val hours = totalSeconds / 3600

@@ -1,19 +1,19 @@
 package com.phillips.phill.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.phillips.phill.ui.analytics.AnalyticsScreen
+import com.phillips.phill.ui.billing.BillingHubScreen
 import com.phillips.phill.ui.billing.ExpenseFormScreen
 import com.phillips.phill.ui.billing.InvoiceBuilderScreen
 import com.phillips.phill.ui.billing.InvoiceDetailScreen
+import com.phillips.phill.ui.billing.PaymentLogScreen
 import com.phillips.phill.ui.comms.ConversationDetailScreen
 import com.phillips.phill.ui.comms.ConversationListScreen
 import com.phillips.phill.ui.components.PhillBottomBar
@@ -61,7 +61,7 @@ fun PhillNavGraph() {
                 entry<ScheduleKey> {
                     ScheduleScreen(
                         onAddAppointment = { backStack.add(AppointmentFormKey()) },
-                        onAppointmentClick = { /* TODO: edit appointment */ }
+                        onAppointmentClick = { appointmentId -> backStack.add(AppointmentFormKey(appointmentId = appointmentId)) }
                     )
                 }
                 entry<JobQueueKey> {
@@ -88,10 +88,17 @@ fun PhillNavGraph() {
                     )
                 }
                 entry<BillingKey> {
-                    PlaceholderScreen("Billing")
+                    BillingHubScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onAddExpense = { backStack.add(ExpenseFormKey()) },
+                        onViewPaymentLog = { backStack.add(PaymentLogKey) }
+                    )
                 }
                 entry<AnalyticsKey> {
-                    PlaceholderScreen("Analytics")
+                    AnalyticsScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() },
+                        onJobClick = { jobId -> backStack.add(JobDetailKey(jobId)) }
+                    )
                 }
                 entry<ShopSettingsKey> {
                     ShopSettingsScreen(
@@ -172,19 +179,12 @@ fun PhillNavGraph() {
                     )
                 }
                 entry<PaymentLogKey> {
-                    PlaceholderScreen("Payment Log")
+                    PaymentLogScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() }
+                    )
                 }
             }
         )
     }
 }
 
-@Composable
-private fun PlaceholderScreen(name: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = name)
-    }
-}

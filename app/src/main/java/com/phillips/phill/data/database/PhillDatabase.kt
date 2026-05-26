@@ -1,6 +1,8 @@
 package com.phillips.phill.data.database
 
 import androidx.room.Database
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.phillips.phill.data.dao.AppointmentDao
@@ -46,7 +48,7 @@ import com.phillips.phill.data.entity.VehicleEntity
         MessageEntity::class,
         ShopProfileEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -64,4 +66,12 @@ abstract class PhillDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
     abstract fun messageDao(): MessageDao
     abstract fun shopProfileDao(): ShopProfileDao
+
+    companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE invoices ADD COLUMN terms_text TEXT DEFAULT NULL")
+            }
+        }
+    }
 }

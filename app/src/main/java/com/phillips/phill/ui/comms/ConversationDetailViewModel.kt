@@ -83,41 +83,52 @@ class ConversationDetailViewModel @Inject constructor(
             // Observe relational data if a customer is linked
             val customerId = conversation.customerId
             if (customerId != null) {
-                // Combine messages, customer, and jobs flows
                 val customer = customerRepository.getCustomerById(customerId)
-                combine(
-                    commsRepository.observeMessages(conversationId),
-                    jobRepository.observeByCustomer(customerId)
-                ) { messages, jobs ->
-                    val activeCount = jobs.count { it.status == JobStatus.EN_ROUTE || it.status == JobStatus.ON_SITE || it.status == JobStatus.SCHEDULED }
-                    _uiState.value = _uiState.value.copy(
-                        conversation = conversation,
-                        customer = customer,
-                        activeJobsCount = activeCount,
-                        messages = messages,
-                        isLoading = false
-                    )
-                }.stateIn(viewModelScope, SharingStarted.Eagerly, Unit)
+                loadLinkedConversation(conversation, customer)
             } else {
                 // Try linking if phone number matches a customer
                 val customer = customerRepository.getCustomerByPhone(conversation.phoneNumber)
                 if (customer != null) {
-                    commsRepository.saveConversation(conversation.copy(customerId = customer.id))
-                    // Re-load will be triggered implicitly or next time, but let's just do a basic load for now
+                    val updatedConversation = conversation.copy(customerId = customer.id)
+                    commsRepository.saveConversation(updatedConversation)
+                    // Re-enter the linked path with the freshly linked conversation
+                    loadLinkedConversation(updatedConversation, customer)
+                    return@launch
                 }
-                
+
+                // Truly un-linked — message-only collection
                 commsRepository.observeMessages(conversationId)
                     .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
                     .collect { messages ->
                         _uiState.value = _uiState.value.copy(
                             conversation = conversation,
-                            customer = customer,
                             messages = messages,
                             isLoading = false
                         )
                     }
             }
         }
+    }
+
+    /**
+     * Loads the full relational data flow for a linked conversation:
+     * messages + active jobs count via combine.
+     */
+    private suspend fun loadLinkedConversation(conversation: ConversationEntity, customer: CustomerEntity?) {
+        val custId = conversation.customerId ?: return
+        combine(
+            commsRepository.observeMessages(conversationId),
+            jobRepository.observeByCustomer(custId)
+        ) { messages, jobs ->
+            val activeCount = jobs.count { it.status == JobStatus.EN_ROUTE || it.status == JobStatus.ON_SITE || it.status == JobStatus.SCHEDULED }
+            _uiState.value = _uiState.value.copy(
+                conversation = conversation,
+                customer = customer,
+                activeJobsCount = activeCount,
+                messages = messages,
+                isLoading = false
+            )
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, Unit)
     }
 
     fun updateDraft(text: String) {

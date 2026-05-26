@@ -214,6 +214,15 @@ fun AppointmentFormScreen(
                     }
                 }
             }
+            // Vehicle-not-selected warning
+            if (state.selectedCustomer != null && state.selectedVehicle == null) {
+                Text(
+                    "⚠ No vehicle selected — a job will not be created for this appointment.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 

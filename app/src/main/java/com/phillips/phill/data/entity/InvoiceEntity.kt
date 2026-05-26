@@ -35,5 +35,7 @@ data class InvoiceEntity(
     @ColumnInfo(name = "created_at_epoch")
     val createdAtEpoch: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "finalized_at_epoch")
-    val finalizedAtEpoch: Long? = null
+    val finalizedAtEpoch: Long? = null,
+    @ColumnInfo(name = "terms_text")
+    val termsText: String? = null
 )

@@ -154,6 +154,7 @@ class InvoiceBuilderViewModel @Inject constructor(
             laborRateCents = profile.laborRateCents,
             partsMarkupBasisPoints = profile.partsMarkupBasisPoints,
             taxRateBasisPoints = profile.taxRateBasisPoints,
+            legalClause = invoice.termsText ?: InvoiceBuilderUiState().legalClause,
             isLoaded = true,
             isEditMode = true
         )
@@ -265,7 +266,8 @@ class InvoiceBuilderViewModel @Inject constructor(
                 taxCents = state.totals.taxCents,
                 totalCents = state.totals.grandTotalCents,
                 serviceFeeCents = serviceFeeCents,
-                finalizedAtEpoch = if (status == InvoiceStatus.INVOICE) System.currentTimeMillis() else null
+                finalizedAtEpoch = if (status == InvoiceStatus.INVOICE) System.currentTimeMillis() else null,
+                termsText = state.legalClause
             )
 
             billingRepository.saveInvoice(invoice)
