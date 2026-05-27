@@ -79,9 +79,10 @@ class InvoiceBuilderViewModel @Inject constructor(
             // Load shop settings for defaults
             val profile = operationsRepository.getShopProfile() ?: ShopProfileEntity()
 
-            if (invoiceId != null && invoiceId != jobId) {
+            val currentInvoiceId = invoiceId
+            if (currentInvoiceId != null && currentInvoiceId != jobId) {
                 // Editing existing invoice
-                val invoice = billingRepository.getInvoiceById(invoiceId)
+                val invoice = billingRepository.getInvoiceById(currentInvoiceId)
                 if (invoice != null) {
                     loadExistingInvoice(invoice, profile)
                     return@launch
