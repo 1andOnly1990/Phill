@@ -1,6 +1,6 @@
 package com.phillips.phill.ui.customers
 
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.VehicleEntity
@@ -27,19 +27,23 @@ data class VehicleFormUiState(
 
 @HiltViewModel
 class VehicleFormViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val customerRepository: CustomerRepository
 ) : ViewModel() {
 
-    private val customerId: String = savedStateHandle.get<String>("customerId") ?: ""
-    private val vehicleId: String? = savedStateHandle.get<String>("vehicleId")
+    private var customerId: String = ""
+    private var vehicleId: String? = null
+    private var initialized = false
 
     private val _uiState = MutableStateFlow(VehicleFormUiState())
     val uiState: StateFlow<VehicleFormUiState> = _uiState.asStateFlow()
 
     private var existingVehicle: VehicleEntity? = null
 
-    init {
+    fun initialize(customerId: String, vehicleId: String?) {
+        if (initialized) return
+        initialized = true
+        this.customerId = customerId
+        this.vehicleId = vehicleId
         if (vehicleId != null) {
             loadExisting(vehicleId)
         }

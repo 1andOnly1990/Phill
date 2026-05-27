@@ -62,12 +62,14 @@ import java.time.format.FormatStyle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JobDetailScreen(
+    jobId: String,
     onNavigateBack: () -> Unit,
     onNavigateToInvoice: (String) -> Unit,
     onNavigateToCustomer: (String) -> Unit,
     viewModel: JobDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) { viewModel.initialize(jobId) }
     val job = state.job
 
     Scaffold(

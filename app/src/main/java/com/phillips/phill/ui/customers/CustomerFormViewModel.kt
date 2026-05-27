@@ -1,6 +1,6 @@
 package com.phillips.phill.ui.customers
 
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.CustomerEntity
@@ -27,19 +27,26 @@ data class CustomerFormUiState(
 
 @HiltViewModel
 class CustomerFormViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val customerRepository: CustomerRepository
 ) : ViewModel() {
 
-    private val customerId: String? = savedStateHandle.get<String>("customerId")
-    private val initialPhone: String? = savedStateHandle.get<String>("initialPhone")
+    private var customerId: String? = null
+    private var initialPhone: String? = null
+    private var initialized = false
 
-    private val _uiState = MutableStateFlow(CustomerFormUiState(phoneNumber = initialPhone ?: ""))
+    private val _uiState = MutableStateFlow(CustomerFormUiState())
     val uiState: StateFlow<CustomerFormUiState> = _uiState.asStateFlow()
 
     private var existingCustomer: CustomerEntity? = null
 
-    init {
+    fun initialize(customerId: String?, initialPhone: String?) {
+        if (initialized) return
+        initialized = true
+        this.customerId = customerId
+        this.initialPhone = initialPhone
+        if (initialPhone != null) {
+            _uiState.value = _uiState.value.copy(phoneNumber = initialPhone)
+        }
         if (customerId != null) {
             loadExisting(customerId)
         }

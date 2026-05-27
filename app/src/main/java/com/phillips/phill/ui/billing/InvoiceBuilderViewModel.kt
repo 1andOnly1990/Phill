@@ -1,6 +1,6 @@
 package com.phillips.phill.ui.billing
 
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.InvoiceEntity
@@ -53,20 +53,24 @@ data class InvoiceBuilderUiState(
 
 @HiltViewModel
 class InvoiceBuilderViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val billingRepository: BillingRepository,
     private val jobRepository: JobRepository,
     private val customerRepository: CustomerRepository,
     private val operationsRepository: OperationsRepository
 ) : ViewModel() {
 
-    private val jobId: String = savedStateHandle.get<String>("jobId") ?: ""
-    private val invoiceId: String? = savedStateHandle.get<String>("invoiceId")
+    private var jobId: String = ""
+    private var invoiceId: String? = null
+    private var initialized = false
 
     private val _uiState = MutableStateFlow(InvoiceBuilderUiState())
     val uiState: StateFlow<InvoiceBuilderUiState> = _uiState.asStateFlow()
 
-    init {
+    fun initialize(jobId: String, invoiceId: String?) {
+        if (initialized) return
+        initialized = true
+        this.jobId = jobId
+        this.invoiceId = invoiceId
         loadData()
     }
 

@@ -1,6 +1,6 @@
 package com.phillips.phill.ui.schedule
 
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.AppointmentEntity
@@ -40,21 +40,25 @@ data class AppointmentFormUiState(
 
 @HiltViewModel
 class AppointmentFormViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val scheduleRepository: ScheduleRepository,
     private val customerRepository: CustomerRepository,
     private val jobRepository: JobRepository
 ) : ViewModel() {
 
-    private val appointmentId: String? = savedStateHandle.get<String>("appointmentId")
-    private val initialCustomerId: String? = savedStateHandle.get<String>("initialCustomerId")
+    private var appointmentId: String? = null
+    private var initialCustomerId: String? = null
+    private var initialized = false
 
     private val _uiState = MutableStateFlow(AppointmentFormUiState())
     val uiState: StateFlow<AppointmentFormUiState> = _uiState.asStateFlow()
 
     private var existingAppointment: AppointmentEntity? = null
 
-    init {
+    fun initialize(appointmentId: String?, initialCustomerId: String?) {
+        if (initialized) return
+        initialized = true
+        this.appointmentId = appointmentId
+        this.initialCustomerId = initialCustomerId
         if (appointmentId != null) {
             loadExisting(appointmentId)
         } else if (initialCustomerId != null) {

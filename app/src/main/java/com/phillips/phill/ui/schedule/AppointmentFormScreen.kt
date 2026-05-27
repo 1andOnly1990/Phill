@@ -41,6 +41,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,11 +64,14 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppointmentFormScreen(
+    appointmentId: String? = null,
+    initialCustomerId: String? = null,
     onNavigateBack: () -> Unit,
     onSaveSuccess: () -> Unit,
     viewModel: AppointmentFormViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) { viewModel.initialize(appointmentId, initialCustomerId) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var selectedDateEpochDay by remember { mutableStateOf<Long?>(null) }

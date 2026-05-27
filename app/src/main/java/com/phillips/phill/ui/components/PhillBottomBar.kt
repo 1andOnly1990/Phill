@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation3.runtime.NavKey
 import com.phillips.phill.navigation.CommsKey
-import com.phillips.phill.navigation.CustomerListKey
+import com.phillips.phill.navigation.MoreHubKey
 import com.phillips.phill.navigation.DashboardKey
 import com.phillips.phill.navigation.JobQueueKey
 import com.phillips.phill.navigation.ScheduleKey
@@ -55,5 +55,5 @@ private enum class BottomBarTab(
     SCHEDULE(ScheduleKey, "Schedule", Icons.Filled.CalendarMonth),
     JOBS(JobQueueKey, "Jobs", Icons.Filled.Build),
     COMMS(CommsKey, "Comms", Icons.AutoMirrored.Filled.Message),
-    MORE(CustomerListKey, "More", Icons.Filled.Menu)
+    MORE(MoreHubKey, "More", Icons.Filled.Menu)
 }

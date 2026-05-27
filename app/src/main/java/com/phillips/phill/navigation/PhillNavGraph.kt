@@ -24,6 +24,7 @@ import com.phillips.phill.ui.customers.VehicleFormScreen
 import com.phillips.phill.ui.dashboard.DashboardScreen
 import com.phillips.phill.ui.jobs.JobDetailScreen
 import com.phillips.phill.ui.jobs.JobQueueScreen
+import com.phillips.phill.ui.more.MoreHubScreen
 import com.phillips.phill.ui.schedule.AppointmentFormScreen
 import com.phillips.phill.ui.schedule.ScheduleScreen
 import com.phillips.phill.ui.settings.ShopSettingsScreen
@@ -75,6 +76,16 @@ fun PhillNavGraph() {
                     )
                 }
 
+                // --- "More" hub ---
+                entry<MoreHubKey> {
+                    MoreHubScreen(
+                        onCustomers = { backStack.add(CustomerListKey) },
+                        onBilling = { backStack.add(BillingKey) },
+                        onAnalytics = { backStack.add(AnalyticsKey) },
+                        onSettings = { backStack.add(ShopSettingsKey) }
+                    )
+                }
+
                 // --- "More" menu screens ---
                 entry<CustomerListKey> {
                     CustomerListScreen(
@@ -109,6 +120,7 @@ fun PhillNavGraph() {
                 // --- Detail screens ---
                 entry<CustomerDetailKey> { key ->
                     CustomerDetailScreen(
+                        customerId = key.customerId,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onEditCustomer = { customerId ->
                             backStack.add(CustomerFormKey(customerId))
@@ -125,6 +137,8 @@ fun PhillNavGraph() {
                 }
                 entry<CustomerFormKey> { key ->
                     CustomerFormScreen(
+                        customerId = key.customerId,
+                        initialPhone = key.initialPhone,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onSaveSuccess = { customerId ->
                             // Pop form and navigate to detail
@@ -135,6 +149,8 @@ fun PhillNavGraph() {
                 }
                 entry<VehicleFormKey> { key ->
                     VehicleFormScreen(
+                        customerId = key.customerId,
+                        vehicleId = key.vehicleId,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onSaveSuccess = {
                             backStack.removeLastOrNull()
@@ -143,12 +159,15 @@ fun PhillNavGraph() {
                 }
                 entry<AppointmentFormKey> { key ->
                     AppointmentFormScreen(
+                        appointmentId = key.appointmentId,
+                        initialCustomerId = key.initialCustomerId,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onSaveSuccess = { backStack.removeLastOrNull() }
                     )
                 }
                 entry<JobDetailKey> { key ->
                     JobDetailScreen(
+                        jobId = key.jobId,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onNavigateToInvoice = { id -> backStack.add(InvoiceBuilderKey(key.jobId, id)) },
                         onNavigateToCustomer = { customerId -> backStack.add(CustomerDetailKey(customerId)) }
@@ -156,17 +175,21 @@ fun PhillNavGraph() {
                 }
                 entry<InvoiceBuilderKey> { key ->
                     InvoiceBuilderScreen(
+                        jobId = key.jobId,
+                        invoiceId = key.invoiceId,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onSaveSuccess = { backStack.removeLastOrNull() }
                     )
                 }
                 entry<InvoiceDetailKey> { key ->
                     InvoiceDetailScreen(
+                        invoiceId = key.invoiceId,
                         onNavigateBack = { backStack.removeLastOrNull() }
                     )
                 }
                 entry<ConversationKey> { key ->
                     ConversationDetailScreen(
+                        conversationId = key.conversationId,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onCreateCustomer = { phone -> backStack.add(CustomerFormKey(initialPhone = phone)) },
                         onScheduleAppointment = { customerId -> backStack.add(AppointmentFormKey(initialCustomerId = customerId)) }
@@ -174,6 +197,8 @@ fun PhillNavGraph() {
                 }
                 entry<ExpenseFormKey> { key ->
                     ExpenseFormScreen(
+                        jobId = key.jobId,
+                        expenseId = key.expenseId,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onSaveSuccess = { backStack.removeLastOrNull() }
                     )

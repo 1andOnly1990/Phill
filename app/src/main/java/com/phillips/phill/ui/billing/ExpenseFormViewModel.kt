@@ -1,6 +1,6 @@
 package com.phillips.phill.ui.billing
 
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.ExpenseEntity
@@ -27,19 +27,23 @@ data class ExpenseFormUiState(
 
 @HiltViewModel
 class ExpenseFormViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val operationsRepository: OperationsRepository
 ) : ViewModel() {
 
-    private val jobId: String? = savedStateHandle.get<String>("jobId")
-    private val expenseId: String? = savedStateHandle.get<String>("expenseId")
+    private var jobId: String? = null
+    private var expenseId: String? = null
+    private var initialized = false
 
     private val _uiState = MutableStateFlow(ExpenseFormUiState())
     val uiState: StateFlow<ExpenseFormUiState> = _uiState.asStateFlow()
 
     private var existingExpense: ExpenseEntity? = null
 
-    init {
+    fun initialize(jobId: String?, expenseId: String?) {
+        if (initialized) return
+        initialized = true
+        this.jobId = jobId
+        this.expenseId = expenseId
         if (expenseId != null) {
             loadExisting(expenseId)
         }

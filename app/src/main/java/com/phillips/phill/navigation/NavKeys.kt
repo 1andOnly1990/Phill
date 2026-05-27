@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object CommsKey : NavKey
 
 // --- "More" menu destinations ---
+@Serializable data object MoreHubKey : NavKey
 @Serializable data object CustomerListKey : NavKey
 @Serializable data object BillingKey : NavKey
 @Serializable data object AnalyticsKey : NavKey

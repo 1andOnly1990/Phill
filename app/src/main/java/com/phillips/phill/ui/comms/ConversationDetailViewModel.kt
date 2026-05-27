@@ -2,7 +2,7 @@ package com.phillips.phill.ui.comms
 
 import android.app.Application
 import android.telephony.SmsManager
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.ConversationEntity
@@ -41,7 +41,6 @@ data class ConversationDetailUiState(
 
 @HiltViewModel
 class ConversationDetailViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val commsRepository: CommsRepository,
     private val customerRepository: CustomerRepository,
     private val jobRepository: JobRepository,
@@ -49,12 +48,16 @@ class ConversationDetailViewModel @Inject constructor(
     private val application: Application
 ) : ViewModel() {
 
-    private val conversationId: String = savedStateHandle.get<String>("conversationId") ?: ""
+    private var conversationId: String = ""
+    private var initialized = false
 
     private val _uiState = MutableStateFlow(ConversationDetailUiState())
     val uiState: StateFlow<ConversationDetailUiState> = _uiState.asStateFlow()
 
-    init {
+    fun initialize(conversationId: String) {
+        if (initialized) return
+        initialized = true
+        this.conversationId = conversationId
         loadConversation()
     }
 

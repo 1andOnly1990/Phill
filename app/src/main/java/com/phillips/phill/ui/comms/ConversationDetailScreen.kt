@@ -57,12 +57,14 @@ import androidx.compose.material3.Surface
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationDetailScreen(
+    conversationId: String,
     onNavigateBack: () -> Unit,
     onCreateCustomer: (String) -> Unit,
     onScheduleAppointment: (String) -> Unit,
     viewModel: ConversationDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) { viewModel.initialize(conversationId) }
     val conversation = state.conversation
     val customer = state.customer
     val listState = rememberLazyListState()

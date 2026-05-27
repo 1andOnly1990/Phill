@@ -1,6 +1,6 @@
 package com.phillips.phill.ui.billing
 
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.InvoiceEntity
@@ -34,16 +34,19 @@ data class InvoiceDetailUiState(
 
 @HiltViewModel
 class InvoiceDetailViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val billingRepository: BillingRepository
 ) : ViewModel() {
 
-    private val invoiceId: String = savedStateHandle.get<String>("invoiceId") ?: ""
+    private var invoiceId: String = ""
+    private var initialized = false
 
     private val _uiState = MutableStateFlow(InvoiceDetailUiState())
     val uiState: StateFlow<InvoiceDetailUiState> = _uiState.asStateFlow()
 
-    init {
+    fun initialize(invoiceId: String) {
+        if (initialized) return
+        initialized = true
+        this.invoiceId = invoiceId
         loadInvoice()
     }
 

@@ -1,6 +1,6 @@
 package com.phillips.phill.ui.customers
 
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.CustomerEntity
@@ -32,18 +32,21 @@ data class CustomerDetailUiState(
 
 @HiltViewModel
 class CustomerDetailViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val customerRepository: CustomerRepository,
     private val jobRepository: JobRepository,
     private val billingRepository: BillingRepository
 ) : ViewModel() {
 
-    private val customerId: String = savedStateHandle.get<String>("customerId") ?: ""
+    private var customerId: String = ""
+    private var initialized = false
 
     private val _uiState = MutableStateFlow(CustomerDetailUiState())
     val uiState: StateFlow<CustomerDetailUiState> = _uiState.asStateFlow()
 
-    init {
+    fun initialize(customerId: String) {
+        if (initialized) return
+        initialized = true
+        this.customerId = customerId
         loadCustomer()
     }
 

@@ -1,6 +1,6 @@
 package com.phillips.phill.ui.jobs
 
-import androidx.lifecycle.SavedStateHandle
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phillips.phill.data.entity.ClockEntryEntity
@@ -43,19 +43,22 @@ data class JobDetailUiState(
 
 @HiltViewModel
 class JobDetailViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val jobRepository: JobRepository,
     private val customerRepository: CustomerRepository,
     private val billingRepository: BillingRepository,
     private val operationsRepository: OperationsRepository
 ) : ViewModel() {
 
-    private val jobId: String = savedStateHandle.get<String>("jobId") ?: ""
+    private var jobId: String = ""
+    private var initialized = false
 
     private val _uiState = MutableStateFlow(JobDetailUiState())
     val uiState: StateFlow<JobDetailUiState> = _uiState.asStateFlow()
 
-    init {
+    fun initialize(jobId: String) {
+        if (initialized) return
+        initialized = true
+        this.jobId = jobId
         loadJobDetail()
     }
 
