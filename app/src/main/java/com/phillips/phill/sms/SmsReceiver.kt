@@ -24,6 +24,9 @@ class SmsReceiver : BroadcastReceiver() {
     @Inject
     lateinit var commsRepository: CommsRepository
 
+    @Inject
+    lateinit var autoReplyManager: AutoReplyManager
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
@@ -57,6 +60,9 @@ class SmsReceiver : BroadcastReceiver() {
                         unreadCount = conversation.unreadCount + 1
                     )
                 )
+
+                // Check if an auto-reply should be sent (after hours, rate-limited)
+                launch { autoReplyManager.maybeAutoReply(conversation.id) }
             }
         }
     }

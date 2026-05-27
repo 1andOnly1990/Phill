@@ -27,5 +27,11 @@ data class ShopProfileEntity(
     @ColumnInfo(name = "owner_name")
     val ownerName: String? = null,
     @ColumnInfo(name = "owner_phone")
-    val ownerPhone: String? = null
+    val ownerPhone: String? = null,
+    @ColumnInfo(name = "auto_reply_enabled", defaultValue = "0")
+    val autoReplyEnabled: Boolean = false,
+    @ColumnInfo(name = "auto_reply_message")
+    val autoReplyMessage: String? = null,
+    @ColumnInfo(name = "business_hours_json")
+    val businessHoursJson: String? = null
 )

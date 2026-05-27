@@ -48,7 +48,7 @@ import com.phillips.phill.data.entity.VehicleEntity
         MessageEntity::class,
         ShopProfileEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -71,6 +71,15 @@ abstract class PhillDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE invoices ADD COLUMN terms_text TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE shop_profile ADD COLUMN auto_reply_enabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE shop_profile ADD COLUMN auto_reply_message TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE shop_profile ADD COLUMN business_hours_json TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE conversations ADD COLUMN last_auto_reply_epoch INTEGER DEFAULT NULL")
             }
         }
     }

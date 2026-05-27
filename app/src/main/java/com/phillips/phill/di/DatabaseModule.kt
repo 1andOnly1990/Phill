@@ -34,7 +34,7 @@ object DatabaseModule {
             context,
             PhillDatabase::class.java,
             "phill.db"
-        ).addMigrations(PhillDatabase.MIGRATION_1_2).build()
+        ).addMigrations(PhillDatabase.MIGRATION_1_2, PhillDatabase.MIGRATION_2_3).build()
     }
 
     @Provides fun provideCustomerDao(db: PhillDatabase): CustomerDao = db.customerDao()

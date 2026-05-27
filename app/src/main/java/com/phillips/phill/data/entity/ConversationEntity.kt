@@ -26,5 +26,7 @@ data class ConversationEntity(
     @ColumnInfo(name = "last_message_epoch")
     val lastMessageEpoch: Long? = null,
     @ColumnInfo(name = "unread_count")
-    val unreadCount: Int = 0
+    val unreadCount: Int = 0,
+    @ColumnInfo(name = "last_auto_reply_epoch")
+    val lastAutoReplyEpoch: Long? = null
 )
