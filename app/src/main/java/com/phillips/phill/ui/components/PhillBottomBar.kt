@@ -17,6 +17,7 @@ import com.phillips.phill.navigation.CommsKey
 import com.phillips.phill.navigation.MoreHubKey
 import com.phillips.phill.navigation.DashboardKey
 import com.phillips.phill.navigation.JobQueueKey
+import com.phillips.phill.navigation.ConversationKey
 import com.phillips.phill.navigation.ScheduleKey
 
 /**
@@ -33,11 +34,15 @@ fun PhillBottomBar(
     onNavigate: (NavKey) -> Unit
 ) {
     val currentKey = backStack.lastOrNull()
+    val activeTabKey: NavKey? = when (currentKey) {
+        is ConversationKey -> CommsKey
+        else -> currentKey
+    }
 
     NavigationBar {
         BottomBarTab.entries.forEach { tab ->
             NavigationBarItem(
-                selected = currentKey == tab.key,
+                selected = activeTabKey == tab.key,
                 onClick = { onNavigate(tab.key) },
                 icon = { Icon(imageVector = tab.icon, contentDescription = tab.label) },
                 label = { Text(tab.label) }

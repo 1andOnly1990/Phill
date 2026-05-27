@@ -19,7 +19,7 @@ class CommsRepository @Inject constructor(
         conversationDao.getById(id)
 
     suspend fun getConversationByPhone(phone: String): ConversationEntity? =
-        conversationDao.getByPhone(phone)
+        conversationDao.getByPhone(phone.filter { it.isDigit() }.takeLast(10))
 
     suspend fun saveConversation(conversation: ConversationEntity) {
         val existing = conversationDao.getById(conversation.id)
@@ -48,9 +48,10 @@ class CommsRepository @Inject constructor(
      * Used by SMS receiver to route inbound messages.
      */
     suspend fun getOrCreateConversation(phone: String, displayName: String? = null): ConversationEntity {
-        val existing = conversationDao.getByPhone(phone)
+        val normalized = phone.filter { it.isDigit() }.takeLast(10)
+        val existing = conversationDao.getByPhone(normalized)
         if (existing != null) return existing
-        val conversation = ConversationEntity(phoneNumber = phone, displayName = displayName)
+        val conversation = ConversationEntity(phoneNumber = normalized, displayName = displayName)
         conversationDao.insert(conversation)
         return conversation
     }

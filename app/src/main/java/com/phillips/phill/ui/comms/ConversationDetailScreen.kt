@@ -61,7 +61,7 @@ fun ConversationDetailScreen(
     onNavigateBack: () -> Unit,
     onCreateCustomer: (String) -> Unit,
     onScheduleAppointment: (String) -> Unit,
-    viewModel: ConversationDetailViewModel = hiltViewModel()
+    viewModel: ConversationDetailViewModel = hiltViewModel(key = conversationId)
 ) {
     val state by viewModel.uiState.collectAsState()
     LaunchedEffect(Unit) { viewModel.initialize(conversationId) }
