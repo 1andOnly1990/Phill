@@ -15,8 +15,15 @@ import javax.inject.Inject
 
 /**
  * Receives inbound SMS messages and stores them in the local database.
- * Per HITL Rule 1: This ONLY stores the message. No autonomous responses.
- * The operator sees it when they open the Comms tab.
+ *
+ * FILTERING RULES (message is ignored if ANY of these are true):
+ *   1. Sender normalizes to fewer than 7 digits → short code (spam/verification/marketing)
+ *   2. Sender is found in Android Contacts → personal contact, not a business lead
+ *
+ * Only messages from unknown numbers (potential new customers) reach the Phill Comms tab.
+ *
+ * Per HITL Rule 1: This ONLY stores the message. No autonomous responses except the
+ * configured auto-reply which is operator-defined and rate-limited.
  */
 @AndroidEntryPoint
 class SmsReceiver : BroadcastReceiver() {
@@ -25,7 +32,14 @@ class SmsReceiver : BroadcastReceiver() {
     lateinit var commsRepository: CommsRepository
 
     @Inject
+    lateinit var contactResolver: ContactResolver
+
+    @Inject
     lateinit var autoReplyManager: AutoReplyManager
+
+    companion object {
+        private const val MIN_REAL_PHONE_DIGITS = 7
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
@@ -33,17 +47,22 @@ class SmsReceiver : BroadcastReceiver() {
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
 
         CoroutineScope(Dispatchers.IO).launch {
-            // Group by sender (multi-part SMS may arrive as multiple SmsMessage objects)
             val grouped = messages.groupBy { it.displayOriginatingAddress ?: "unknown" }
 
             for ((sender, parts) in grouped) {
                 val body = parts.joinToString("") { it.displayMessageBody ?: "" }
                 if (body.isBlank()) continue
 
-                // Get or create conversation for this phone number
-                val conversation = commsRepository.getOrCreateConversation(sender)
+                // --- FILTER 1: Short code check ---
+                val normalizedSender = sender.filter { it.isDigit() }.takeLast(10)
+                if (normalizedSender.length < MIN_REAL_PHONE_DIGITS) continue
 
-                // Store the message
+                // --- FILTER 2: Known personal contact check ---
+                if (contactResolver.isKnownContact(sender)) continue
+
+                // --- PASSED FILTERS: Store as potential business lead ---
+                val conversation = commsRepository.getOrCreateConversation(normalizedSender)
+
                 val message = MessageEntity(
                     conversationId = conversation.id,
                     body = body,
@@ -53,7 +72,6 @@ class SmsReceiver : BroadcastReceiver() {
                 )
                 commsRepository.saveMessage(message)
 
-                // Update conversation's last message time and unread count
                 commsRepository.saveConversation(
                     conversation.copy(
                         lastMessageEpoch = System.currentTimeMillis(),

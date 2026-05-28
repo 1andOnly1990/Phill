@@ -15,15 +15,30 @@ import javax.inject.Singleton
 @Singleton
 class SmsSyncManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val commsRepository: CommsRepository
+    private val commsRepository: CommsRepository,
+    private val contactResolver: ContactResolver
 ) {
+    companion object {
+        /**
+         * Minimum digit count for a real phone number.
+         * Anything with fewer than 7 digits is a short code (spam, verification, marketing).
+         * Examples of short codes: "69534" (5 digits), "778273" (6 digits).
+         * Real US numbers have 10 digits; international has more.
+         */
+        private const val MIN_REAL_PHONE_DIGITS = 7
+    }
+
     /**
-     * Reads ALL SMS threads from the device's native content provider and imports them
-     * into the Phill database. Groups by phone number, creates conversations, and deduplicates
-     * against already-stored messages.
+     * Reads SMS threads from the device's native content provider and imports BUSINESS-RELEVANT
+     * threads into the Phill database.
      *
-     * Call this once after SMS permission is granted to bootstrap the Comms tab with the
-     * full bidirectional SMS history from the device.
+     * FILTERING RULES (a thread is skipped if ANY of these are true):
+     *   1. The address normalizes to fewer than 7 digits → short code (spam/verification/marketing)
+     *   2. The phone number is found in Android Contacts → personal contact, not a business lead
+     *
+     * Only unknown numbers (potential new customers who have not been saved in contacts) are imported.
+     *
+     * Call this once after SMS permission is granted to bootstrap the Comms tab.
      */
     suspend fun syncAllSmsThreads() = withContext(Dispatchers.IO) {
         val uri = Telephony.Sms.CONTENT_URI
@@ -42,7 +57,6 @@ class SmsSyncManager @Inject constructor(
             "${Telephony.Sms.DATE} ASC"
         ) ?: return@withContext
 
-        // Batch: collect all messages first, then write in bulk per conversation
         data class RawSms(
             val address: String,
             val body: String,
@@ -67,23 +81,30 @@ class SmsSyncManager @Inject constructor(
             }
         }
 
-        // Group by normalized phone number (last 10 digits for matching)
+        // Group by normalized phone number (digits only, last 10 for 10-digit numbers)
         val grouped = allMessages.groupBy { it.address.filter { c -> c.isDigit() }.takeLast(10) }
 
-        for ((_, messages) in grouped) {
+        for ((normalizedPhone, messages) in grouped) {
             if (messages.isEmpty()) continue
+
+            // --- FILTER 1: Short code check ---
+            // If normalized number has fewer than MIN_REAL_PHONE_DIGITS digits, skip.
+            // Short codes are 5–6 digit numbers used by spam, marketing, and 2FA services.
+            if (normalizedPhone.length < MIN_REAL_PHONE_DIGITS) continue
+
+            // --- FILTER 2: Known personal contact check ---
+            // If this number is saved in the device contacts, it is a personal contact.
+            // Skip it — Phill Comms is only for unknown potential customers.
             val rawAddress = messages.first().address
+            if (contactResolver.isKnownContact(rawAddress)) continue
 
-            // Get or create conversation for this phone number
-            val conversation = commsRepository.getOrCreateConversation(rawAddress)
+            // --- PASSED FILTERS: Import this conversation as a potential lead ---
+            val conversation = commsRepository.getOrCreateConversation(normalizedPhone)
 
-            // Get existing messages for deduplication
             val existingMessages = commsRepository.getMessagesByConversationIdSync(conversation.id)
-
             var latestEpoch = conversation.lastMessageEpoch ?: 0L
 
             for (sms in messages) {
-                // Deduplicate: same body and within 5 seconds
                 val exists = existingMessages.any { existing ->
                     existing.body == sms.body && Math.abs(existing.timestampEpoch - sms.date) < 5000
                 }
@@ -104,7 +125,6 @@ class SmsSyncManager @Inject constructor(
                 }
             }
 
-            // Update conversation's last message timestamp
             if (latestEpoch > (conversation.lastMessageEpoch ?: 0L)) {
                 commsRepository.saveConversation(
                     conversation.copy(lastMessageEpoch = latestEpoch)
@@ -115,8 +135,8 @@ class SmsSyncManager @Inject constructor(
 
     /**
      * Syncs SMS messages for a specific conversation by querying the native device database.
-     * This ensures Phill captures the complete bidirectional history, including messages sent
-     * outside the app.
+     * Used to refresh a single thread without a full re-sync.
+     * No additional filtering here — the conversation already passed filters when created.
      */
     suspend fun syncConversation(conversationId: String) = withContext(Dispatchers.IO) {
         val conversation = commsRepository.getConversationById(conversationId) ?: return@withContext
@@ -153,7 +173,6 @@ class SmsSyncManager @Inject constructor(
                 val body = it.getString(bodyIndex) ?: continue
                 val date = it.getLong(dateIndex)
                 val type = it.getInt(typeIndex)
-
                 val isInbound = type == Telephony.Sms.MESSAGE_TYPE_INBOX
 
                 val exists = existingMessages.any { existing ->
