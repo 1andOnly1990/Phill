@@ -15,6 +15,7 @@ import com.phillips.phill.data.dao.MileageEntryDao
 import com.phillips.phill.data.dao.PaymentDao
 import com.phillips.phill.data.dao.ShopProfileDao
 import com.phillips.phill.data.dao.VehicleDao
+import com.phillips.phill.data.dao.AttachmentDao
 import com.phillips.phill.data.database.PhillDatabase
 import dagger.Module
 import dagger.Provides
@@ -34,7 +35,7 @@ object DatabaseModule {
             context,
             PhillDatabase::class.java,
             "phill.db"
-        ).addMigrations(PhillDatabase.MIGRATION_1_2, PhillDatabase.MIGRATION_2_3).build()
+        ).addMigrations(PhillDatabase.MIGRATION_1_2, PhillDatabase.MIGRATION_2_3, PhillDatabase.MIGRATION_3_4).build()
     }
 
     @Provides fun provideCustomerDao(db: PhillDatabase): CustomerDao = db.customerDao()
@@ -50,4 +51,5 @@ object DatabaseModule {
     @Provides fun provideConversationDao(db: PhillDatabase): ConversationDao = db.conversationDao()
     @Provides fun provideMessageDao(db: PhillDatabase): MessageDao = db.messageDao()
     @Provides fun provideShopProfileDao(db: PhillDatabase): ShopProfileDao = db.shopProfileDao()
+    @Provides fun provideAttachmentDao(db: PhillDatabase): AttachmentDao = db.attachmentDao()
 }

@@ -54,6 +54,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Surface
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.ui.platform.LocalContext
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationDetailScreen(
@@ -68,6 +75,16 @@ fun ConversationDetailScreen(
     val conversation = state.conversation
     val customer = state.customer
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+
+    // File picker for media sharing (Issue 5)
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null && conversation != null) {
+            viewModel.shareMedia(context, uri, conversation.phoneNumber)
+        }
+    }
 
     // Scroll to bottom when new messages arrive
     LaunchedEffect(state.messages.size) {
@@ -108,6 +125,16 @@ fun ConversationDetailScreen(
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Attach button (Issue 5)
+                IconButton(
+                    onClick = { filePickerLauncher.launch("*/*") }
+                ) {
+                    Icon(
+                        Icons.Filled.AttachFile,
+                        contentDescription = "Attach file",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 OutlinedTextField(
                     value = state.draftMessage,
                     onValueChange = viewModel::updateDraft,

@@ -18,6 +18,7 @@ import com.phillips.phill.data.dao.MileageEntryDao
 import com.phillips.phill.data.dao.PaymentDao
 import com.phillips.phill.data.dao.ShopProfileDao
 import com.phillips.phill.data.dao.VehicleDao
+import com.phillips.phill.data.dao.AttachmentDao
 import com.phillips.phill.data.entity.AppointmentEntity
 import com.phillips.phill.data.entity.ClockEntryEntity
 import com.phillips.phill.data.entity.ConversationEntity
@@ -31,6 +32,7 @@ import com.phillips.phill.data.entity.MileageEntryEntity
 import com.phillips.phill.data.entity.PaymentEntity
 import com.phillips.phill.data.entity.ShopProfileEntity
 import com.phillips.phill.data.entity.VehicleEntity
+import com.phillips.phill.data.entity.AttachmentEntity
 
 @Database(
     entities = [
@@ -46,9 +48,10 @@ import com.phillips.phill.data.entity.VehicleEntity
         ExpenseEntity::class,
         ConversationEntity::class,
         MessageEntity::class,
-        ShopProfileEntity::class
+        ShopProfileEntity::class,
+        AttachmentEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -66,6 +69,7 @@ abstract class PhillDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
     abstract fun messageDao(): MessageDao
     abstract fun shopProfileDao(): ShopProfileDao
+    abstract fun attachmentDao(): AttachmentDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -80,6 +84,44 @@ abstract class PhillDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE shop_profile ADD COLUMN auto_reply_message TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE shop_profile ADD COLUMN business_hours_json TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE conversations ADD COLUMN last_auto_reply_epoch INTEGER DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue 1: Conversation source + review flag
+                db.execSQL("ALTER TABLE conversations ADD COLUMN source TEXT NOT NULL DEFAULT 'SMS'")
+                db.execSQL("ALTER TABLE conversations ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0")
+
+                // Issue 4: Invoice relational chain
+                db.execSQL("ALTER TABLE invoices ADD COLUMN vehicle_id TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE invoices ADD COLUMN appointment_id TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE invoices ADD COLUMN invoice_number TEXT DEFAULT NULL")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_invoices_vehicle_id ON invoices(vehicle_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_invoices_appointment_id ON invoices(appointment_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_invoices_invoice_number ON invoices(invoice_number)")
+
+                // Issue 5: Attachments table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS attachments (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        conversation_id TEXT NOT NULL,
+                        message_id TEXT DEFAULT NULL,
+                        job_id TEXT DEFAULT NULL,
+                        file_uri TEXT NOT NULL,
+                        file_name TEXT,
+                        mime_type TEXT NOT NULL,
+                        file_size_bytes INTEGER,
+                        shared_at_epoch INTEGER NOT NULL,
+                        thumbnail_uri TEXT,
+                        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+                        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL,
+                        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_conversation_id ON attachments(conversation_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_message_id ON attachments(message_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_job_id ON attachments(job_id)")
             }
         }
     }

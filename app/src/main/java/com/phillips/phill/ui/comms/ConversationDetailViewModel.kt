@@ -1,6 +1,9 @@
 package com.phillips.phill.ui.comms
 
 import android.app.Application
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.telephony.SmsManager
 
 import androidx.lifecycle.ViewModel
@@ -27,6 +30,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 
+import androidx.core.content.FileProvider
+import com.phillips.phill.data.dao.AttachmentDao
+import com.phillips.phill.data.entity.AttachmentEntity
+import java.io.File
+
 data class ConversationDetailUiState(
     val conversation: ConversationEntity? = null,
     val customer: CustomerEntity? = null,
@@ -45,6 +53,7 @@ class ConversationDetailViewModel @Inject constructor(
     private val customerRepository: CustomerRepository,
     private val jobRepository: JobRepository,
     private val smsSyncManager: SmsSyncManager,
+    private val attachmentDao: AttachmentDao,
     private val application: Application
 ) : ViewModel() {
 
@@ -187,6 +196,71 @@ class ConversationDetailViewModel @Inject constructor(
                     isSending = false,
                     sendError = "Failed to send: ${e.message}"
                 )
+            }
+        }
+    }
+
+    /**
+     * Share a media file via Intent to the default messaging app.
+     * HITL Rule 1: Operator explicitly selected the file and tapped attach.
+     *
+     * Steps:
+     * 1. Copy the selected file to app-private shared_media/ directory
+     * 2. Create a content:// URI via FileProvider
+     * 3. Launch ACTION_SEND Intent
+     * 4. Record the attachment in the database
+     */
+    fun shareMedia(context: Context, contentUri: Uri, phoneNumber: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    // Copy file to app-private directory for FileProvider access
+                    val mediaDir = File(context.filesDir, "shared_media").apply { mkdirs() }
+                    val fileName = contentUri.lastPathSegment?.substringAfterLast('/') ?: "attachment"
+                    val destFile = File(mediaDir, "${System.currentTimeMillis()}_$fileName")
+
+                    context.contentResolver.openInputStream(contentUri)?.use { input ->
+                        destFile.outputStream().use { output -> input.copyTo(output) }
+                    } ?: return@withContext
+
+                    val mimeType = context.contentResolver.getType(contentUri) ?: "application/octet-stream"
+
+                    // Create FileProvider URI
+                    val shareUri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        destFile
+                    )
+
+                    // Launch share Intent
+                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                        putExtra(Intent.EXTRA_STREAM, shareUri)
+                        putExtra("address", phoneNumber)
+                        type = mimeType
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+
+                    val chooserIntent = Intent.createChooser(sendIntent, "Share via...").apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(chooserIntent)
+
+                    // Record in database
+                    val attachment = AttachmentEntity(
+                        conversationId = conversationId,
+                        fileUri = destFile.absolutePath,
+                        fileName = destFile.name,
+                        mimeType = mimeType,
+                        fileSizeBytes = destFile.length(),
+                        sharedAtEpoch = System.currentTimeMillis()
+                    )
+                    attachmentDao.insert(attachment)
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        sendError = "Failed to share: ${e.message}"
+                    )
+                }
             }
         }
     }

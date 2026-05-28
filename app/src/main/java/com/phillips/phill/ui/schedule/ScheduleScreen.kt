@@ -188,6 +188,10 @@ private fun AppointmentCard(
     val startTime = Instant.ofEpochMilli(appointment.scheduledStartEpoch)
         .atZone(zone).toLocalTime().format(timeFormatter)
 
+    val endTime = appointment.scheduledEndEpoch?.let { endEpoch ->
+        Instant.ofEpochMilli(endEpoch).atZone(zone).toLocalTime().format(timeFormatter)
+    }
+
     // Show buffered times
     val setupTime = Instant.ofEpochMilli(viewModel.getBufferedStartEpoch(appointment))
         .atZone(zone).toLocalTime().format(timeFormatter)
@@ -217,7 +221,7 @@ private fun AppointmentCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = startTime,
+                    text = if (endTime != null) "$startTime – $endTime" else startTime,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )

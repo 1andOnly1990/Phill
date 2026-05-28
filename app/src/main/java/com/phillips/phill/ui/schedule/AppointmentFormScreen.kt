@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.phillips.phill.ui.components.PhillTimePickerDialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.phillips.phill.data.entity.VehicleEntity
 import com.phillips.phill.domain.enums.AppointmentStatus
@@ -74,9 +75,12 @@ fun AppointmentFormScreen(
     LaunchedEffect(Unit) { viewModel.initialize(appointmentId, initialCustomerId) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
     var selectedDateEpochDay by remember { mutableStateOf<Long?>(null) }
     var selectedHour by remember { mutableStateOf(9) }
     var selectedMinute by remember { mutableStateOf(0) }
+    var selectedEndHour by remember { mutableStateOf(11) }
+    var selectedEndMinute by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -282,6 +286,26 @@ fun AppointmentFormScreen(
                 )
             }
 
+            // --- End Time (Issue 3) ---
+            OutlinedTextField(
+                value = if (state.scheduledEndEpoch != null) {
+                    Instant.ofEpochMilli(state.scheduledEndEpoch)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalTime()
+                        .format(DateTimeFormatter.ofPattern("h:mm a"))
+                } else "",
+                onValueChange = {},
+                label = { Text("End Time (optional)") },
+                modifier = Modifier.fillMaxWidth().clickable { showEndTimePicker = true },
+                readOnly = true,
+                trailingIcon = {
+                    IconButton(onClick = { showEndTimePicker = true }) {
+                        Icon(Icons.Filled.DateRange, contentDescription = "Pick end time")
+                    }
+                }
+            )
+
+            // Duration + setup time display
             if (state.scheduledStartEpoch > 0) {
                 val setupTime = Instant.ofEpochMilli(state.scheduledStartEpoch - BUFFER_MILLIS)
                     .atZone(ZoneId.systemDefault()).toLocalTime()
@@ -291,6 +315,16 @@ fun AppointmentFormScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.tertiary
                 )
+
+                if (state.scheduledEndEpoch != null && state.scheduledEndEpoch > state.scheduledStartEpoch) {
+                    val durationMs = state.scheduledEndEpoch - state.scheduledStartEpoch
+                    val durationHours = durationMs / (1000.0 * 60 * 60)
+                    Text(
+                        "⏱ ${String.format("%.1f", durationHours)} hours estimated",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
 
             // --- Address ---
@@ -367,40 +401,45 @@ fun AppointmentFormScreen(
         }
     }
 
-    // --- Time Picker Dialog ---
+    // --- Start Time Picker Dialog (refactored to use shared PhillTimePickerDialog) ---
     if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(
+        PhillTimePickerDialog(
+            title = "Select Start Time",
             initialHour = selectedHour,
-            initialMinute = selectedMinute
-        )
-        Dialog(onDismissRequest = { showTimePicker = false }) {
-            Card {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Select Time", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TimePicker(state = timePickerState)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
-                        TextButton(onClick = {
-                            selectedHour = timePickerState.hour
-                            selectedMinute = timePickerState.minute
-                            selectedDateEpochDay?.let {
-                                updateEpoch(it, selectedHour, selectedMinute, viewModel)
-                            }
-                            showTimePicker = false
-                        }) { Text("OK") }
-                    }
+            initialMinute = selectedMinute,
+            onConfirm = { hour, minute ->
+                selectedHour = hour
+                selectedMinute = minute
+                selectedDateEpochDay?.let {
+                    updateEpoch(it, selectedHour, selectedMinute, viewModel)
                 }
-            }
-        }
+                showTimePicker = false
+            },
+            onDismiss = { showTimePicker = false }
+        )
+    }
+
+    // --- End Time Picker Dialog (Issue 3) ---
+    if (showEndTimePicker) {
+        PhillTimePickerDialog(
+            title = "Select End Time",
+            initialHour = selectedEndHour,
+            initialMinute = selectedEndMinute,
+            onConfirm = { hour, minute ->
+                selectedEndHour = hour
+                selectedEndMinute = minute
+                selectedDateEpochDay?.let { epochDay ->
+                    updateEndEpoch(epochDay, selectedEndHour, selectedEndMinute, viewModel)
+                }
+                showEndTimePicker = false
+            },
+            onDismiss = { showEndTimePicker = false }
+        )
     }
 }
+
+/** 15 minutes in milliseconds — used for the setup/arrival buffer. */
+private const val BUFFER_MILLIS = 15L * 60L * 1000L
 
 private fun updateEpoch(
     epochDay: Long,
@@ -412,4 +451,16 @@ private fun updateEpoch(
     val time = LocalTime.of(hour, minute)
     val epoch = date.atTime(time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     viewModel.updateScheduledStartEpoch(epoch)
+}
+
+private fun updateEndEpoch(
+    epochDay: Long,
+    hour: Int,
+    minute: Int,
+    viewModel: AppointmentFormViewModel
+) {
+    val date = LocalDate.ofEpochDay(epochDay)
+    val time = LocalTime.of(hour, minute)
+    val epoch = date.atTime(time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    viewModel.updateScheduledEndEpoch(epoch)
 }

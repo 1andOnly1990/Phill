@@ -27,6 +27,12 @@ interface InvoiceDao {
     @Query("SELECT * FROM invoices WHERE id = :id")
     suspend fun getById(id: String): InvoiceEntity?
 
+    @Query("SELECT * FROM invoices WHERE vehicle_id = :vehicleId ORDER BY created_at_epoch DESC")
+    fun observeByVehicle(vehicleId: String): Flow<List<InvoiceEntity>>
+
+    @Query("SELECT MAX(CAST(SUBSTR(invoice_number, 5) AS INTEGER)) FROM invoices WHERE invoice_number LIKE :prefix || '%'")
+    suspend fun getMaxNumberForPrefix(prefix: String): Int?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(invoice: InvoiceEntity): Long
 

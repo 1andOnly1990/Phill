@@ -12,9 +12,11 @@ import java.util.UUID
     tableName = "invoices",
     foreignKeys = [
         ForeignKey(entity = JobEntity::class, parentColumns = ["id"], childColumns = ["job_id"], onDelete = ForeignKey.CASCADE),
-        ForeignKey(entity = CustomerEntity::class, parentColumns = ["id"], childColumns = ["customer_id"], onDelete = ForeignKey.CASCADE)
+        ForeignKey(entity = CustomerEntity::class, parentColumns = ["id"], childColumns = ["customer_id"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = VehicleEntity::class, parentColumns = ["id"], childColumns = ["vehicle_id"], onDelete = ForeignKey.SET_NULL),
+        ForeignKey(entity = AppointmentEntity::class, parentColumns = ["id"], childColumns = ["appointment_id"], onDelete = ForeignKey.SET_NULL)
     ],
-    indices = [Index("job_id"), Index("customer_id"), Index("status")]
+    indices = [Index("job_id"), Index("customer_id"), Index("status"), Index("vehicle_id"), Index("appointment_id"), Index("invoice_number")]
 )
 data class InvoiceEntity(
     @PrimaryKey
@@ -37,5 +39,11 @@ data class InvoiceEntity(
     @ColumnInfo(name = "finalized_at_epoch")
     val finalizedAtEpoch: Long? = null,
     @ColumnInfo(name = "terms_text")
-    val termsText: String? = null
+    val termsText: String? = null,
+    @ColumnInfo(name = "vehicle_id")
+    val vehicleId: String? = null,
+    @ColumnInfo(name = "appointment_id")
+    val appointmentId: String? = null,
+    @ColumnInfo(name = "invoice_number")
+    val invoiceNumber: String? = null
 )

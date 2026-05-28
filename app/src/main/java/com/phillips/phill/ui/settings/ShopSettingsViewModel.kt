@@ -55,7 +55,8 @@ data class ShopSettingsUiState(
     // --- Meta ---
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
-    val isLoaded: Boolean = false
+    val isLoaded: Boolean = false,
+    val validationError: String? = null
 )
 
 @HiltViewModel
@@ -163,10 +164,10 @@ class ShopSettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(autoReplyEnabled = value, saveSuccess = false)
     }
 
-    /** Clamps message to 160 characters (single SMS segment). */
+    /** Clamps message to 480 characters (3 SMS segments). */
     fun updateAutoReplyMessage(value: String) {
         _uiState.value = _uiState.value.copy(
-            autoReplyMessage = value.take(160),
+            autoReplyMessage = value.take(480),
             saveSuccess = false
         )
     }
@@ -199,6 +200,20 @@ class ShopSettingsViewModel @Inject constructor(
         _uiState.value = state.copy(isSaving = true)
 
         viewModelScope.launch {
+            // Validate close > open for each open day
+            for (day in state.businessHours) {
+                if (!day.isOpen) continue
+                val openMin = hhmmToMinutes(day.opensAt)
+                val closeMin = hhmmToMinutes(day.closesAt)
+                if (closeMin <= openMin) {
+                    _uiState.value = state.copy(
+                        isSaving = false,
+                        validationError = "${day.dayName}: close time must be after open time"
+                    )
+                    return@launch
+                }
+            }
+
             val laborCents = BillingEngine.parseDollarsToCents(state.laborRateDisplay) ?: 12500L
             val feeCents = BillingEngine.parseDollarsToCents(state.serviceFeeDisplay) ?: 6000L
             val markupBp = BillingEngine.parsePercentToBasisPoints(state.partsMarkupDisplay) ?: 14000
@@ -234,8 +249,16 @@ class ShopSettingsViewModel @Inject constructor(
             )
 
             operationsRepository.saveShopProfile(profile)
-            _uiState.value = _uiState.value.copy(isSaving = false, saveSuccess = true)
+            _uiState.value = _uiState.value.copy(isSaving = false, saveSuccess = true, validationError = null)
         }
+    }
+
+    /** Parses "HH:MM" to minutes since midnight. Returns 0 if malformed. */
+    private fun hhmmToMinutes(hhmm: String): Int {
+        val parts = hhmm.split(":")
+        val h = parts.getOrNull(0)?.toIntOrNull() ?: return 0
+        val m = parts.getOrNull(1)?.toIntOrNull() ?: return 0
+        return h * 60 + m
     }
 
     // --- Conversion helpers ---

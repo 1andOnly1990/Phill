@@ -150,6 +150,10 @@ class AppointmentFormViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(scheduledStartEpoch = epoch, validationError = null)
     }
 
+    fun updateScheduledEndEpoch(epoch: Long) {
+        _uiState.value = _uiState.value.copy(scheduledEndEpoch = epoch, validationError = null)
+    }
+
     fun updateStatus(status: AppointmentStatus) {
         _uiState.value = _uiState.value.copy(status = status)
     }
@@ -167,6 +171,10 @@ class AppointmentFormViewModel @Inject constructor(
         }
         if (state.scheduledStartEpoch == 0L) {
             _uiState.value = state.copy(validationError = "Please select a date and time")
+            return
+        }
+        if (state.scheduledEndEpoch != null && state.scheduledEndEpoch <= state.scheduledStartEpoch) {
+            _uiState.value = state.copy(validationError = "End time must be after start time")
             return
         }
 

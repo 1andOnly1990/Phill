@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths for sharing media attachments (Issue 5).
+    Provides content:// URIs instead of file:// URIs for Android 7+ compatibility.
+-->
+<paths>
+    <files-path name="shared_media" path="shared_media/" />
+    <cache-path name="shared_cache" path="shared_media/" />
+</paths>

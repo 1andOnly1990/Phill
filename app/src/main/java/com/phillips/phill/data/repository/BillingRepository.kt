@@ -38,6 +38,15 @@ class BillingRepository @Inject constructor(
 
     suspend fun deleteInvoice(invoice: InvoiceEntity) = invoiceDao.delete(invoice)
 
+    fun observeInvoicesByVehicle(vehicleId: String): Flow<List<InvoiceEntity>> =
+        invoiceDao.observeByVehicle(vehicleId)
+
+    suspend fun generateInvoiceNumber(isEstimate: Boolean): String {
+        val prefix = if (isEstimate) "EST-" else "INV-"
+        val maxNum = invoiceDao.getMaxNumberForPrefix(prefix) ?: 0
+        return "$prefix${String.format("%03d", maxNum + 1)}"
+    }
+
     // Line items
     fun observeLineItems(invoiceId: String): Flow<List<LineItemEntity>> =
         lineItemDao.observeByInvoice(invoiceId)

@@ -1,5 +1,6 @@
 package com.phillips.phill.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,13 +35,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.phillips.phill.ui.components.PhillTimePickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -256,15 +260,15 @@ fun ShopSettingsScreen(
                         ) {
                             Text("Sent once per 2-hour window per contact")
                             Text(
-                                text = "${state.autoReplyMessage.length}/160",
-                                color = if (state.autoReplyMessage.length > 140)
+                                text = "${state.autoReplyMessage.length}/480 (${(state.autoReplyMessage.length / 160) + 1} SMS)",
+                                color = if (state.autoReplyMessage.length > 440)
                                     MaterialTheme.colorScheme.error
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     },
-                    isError = state.autoReplyMessage.length >= 160
+                    isError = state.autoReplyMessage.length >= 480
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -291,6 +295,15 @@ fun ShopSettingsScreen(
                     }
                 }
             }
+            // Validation error display
+            state.validationError?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(80.dp)) // Room for FAB
         }
@@ -307,6 +320,27 @@ private fun DayHoursRow(
     onOpensAtChange: (String) -> Unit,
     onClosesAtChange: (String) -> Unit
 ) {
+    var showOpenPicker by remember { mutableStateOf(false) }
+    var showClosePicker by remember { mutableStateOf(false) }
+
+    // Parse HH:MM strings to hours/minutes for the picker
+    val openParts = opensAt.split(":")
+    val openHour = openParts.getOrNull(0)?.toIntOrNull() ?: 8
+    val openMinute = openParts.getOrNull(1)?.toIntOrNull() ?: 0
+    val closeParts = closesAt.split(":")
+    val closeHour = closeParts.getOrNull(0)?.toIntOrNull() ?: 17
+    val closeMinute = closeParts.getOrNull(1)?.toIntOrNull() ?: 0
+
+    // Format for display in 12-hour format
+    val openDisplay = try {
+        java.time.LocalTime.of(openHour, openMinute)
+            .format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+    } catch (e: Exception) { opensAt }
+    val closeDisplay = try {
+        java.time.LocalTime.of(closeHour, closeMinute)
+            .format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+    } catch (e: Exception) { closesAt }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -345,27 +379,59 @@ private fun DayHoursRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = opensAt,
-                    onValueChange = onOpensAtChange,
+                    value = openDisplay,
+                    onValueChange = {},
                     label = { Text("Opens") },
-                    placeholder = { Text("08:00") },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).clickable { showOpenPicker = true },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    supportingText = { Text("24-hr HH:MM") }
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showOpenPicker = true }) {
+                            Icon(Icons.Filled.Check, contentDescription = "Pick time")
+                        }
+                    }
                 )
                 OutlinedTextField(
-                    value = closesAt,
-                    onValueChange = onClosesAtChange,
+                    value = closeDisplay,
+                    onValueChange = {},
                     label = { Text("Closes") },
-                    placeholder = { Text("17:00") },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).clickable { showClosePicker = true },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    supportingText = { Text("24-hr HH:MM") }
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showClosePicker = true }) {
+                            Icon(Icons.Filled.Check, contentDescription = "Pick time")
+                        }
+                    }
                 )
             }
         }
+    }
+
+    // TimePicker dialogs
+    if (showOpenPicker) {
+        PhillTimePickerDialog(
+            title = "$dayName — Opens At",
+            initialHour = openHour,
+            initialMinute = openMinute,
+            onConfirm = { h, m ->
+                onOpensAtChange(String.format("%02d:%02d", h, m))
+                showOpenPicker = false
+            },
+            onDismiss = { showOpenPicker = false }
+        )
+    }
+    if (showClosePicker) {
+        PhillTimePickerDialog(
+            title = "$dayName — Closes At",
+            initialHour = closeHour,
+            initialMinute = closeMinute,
+            onConfirm = { h, m ->
+                onClosesAtChange(String.format("%02d:%02d", h, m))
+                showClosePicker = false
+            },
+            onDismiss = { showClosePicker = false }
+        )
     }
 }
 

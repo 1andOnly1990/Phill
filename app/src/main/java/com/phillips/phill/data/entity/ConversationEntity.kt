@@ -27,6 +27,10 @@ data class ConversationEntity(
     val lastMessageEpoch: Long? = null,
     @ColumnInfo(name = "unread_count")
     val unreadCount: Int = 0,
+    @ColumnInfo(name = "source", defaultValue = "SMS")
+    val source: String = "SMS",
+    @ColumnInfo(name = "needs_review", defaultValue = "0")
+    val needsReview: Boolean = false,
     @ColumnInfo(name = "last_auto_reply_epoch")
     val lastAutoReplyEpoch: Long? = null
 )
