@@ -287,9 +287,10 @@ fun AppointmentFormScreen(
             }
 
             // --- End Time (Issue 3) ---
+            val endEpoch = state.scheduledEndEpoch
             OutlinedTextField(
-                value = if (state.scheduledEndEpoch != null) {
-                    Instant.ofEpochMilli(state.scheduledEndEpoch)
+                value = if (endEpoch != null) {
+                    Instant.ofEpochMilli(endEpoch)
                         .atZone(ZoneId.systemDefault())
                         .toLocalTime()
                         .format(DateTimeFormatter.ofPattern("h:mm a"))
@@ -316,8 +317,8 @@ fun AppointmentFormScreen(
                     color = MaterialTheme.colorScheme.tertiary
                 )
 
-                if (state.scheduledEndEpoch != null && state.scheduledEndEpoch > state.scheduledStartEpoch) {
-                    val durationMs = state.scheduledEndEpoch - state.scheduledStartEpoch
+                if (endEpoch != null && endEpoch > state.scheduledStartEpoch) {
+                    val durationMs = endEpoch - state.scheduledStartEpoch
                     val durationHours = durationMs / (1000.0 * 60 * 60)
                     Text(
                         "⏱ ${String.format("%.1f", durationHours)} hours estimated",
@@ -437,9 +438,6 @@ fun AppointmentFormScreen(
         )
     }
 }
-
-/** 15 minutes in milliseconds — used for the setup/arrival buffer. */
-private const val BUFFER_MILLIS = 15L * 60L * 1000L
 
 private fun updateEpoch(
     epochDay: Long,
