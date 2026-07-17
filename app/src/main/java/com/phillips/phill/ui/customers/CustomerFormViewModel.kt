@@ -39,14 +39,25 @@ class CustomerFormViewModel @Inject constructor(
 
     private var existingCustomer: CustomerEntity? = null
 
-    fun initialize(customerId: String?, initialPhone: String?) {
+    fun initialize(
+        customerId: String?,
+        initialPhone: String?,
+        initialFirstName: String? = null,
+        initialLastName: String? = null
+    ) {
         if (initialized) return
         initialized = true
         this.customerId = customerId
         this.initialPhone = initialPhone
-        if (initialPhone != null) {
-            _uiState.value = _uiState.value.copy(phoneNumber = initialPhone)
-        }
+
+        // Pre-fill from extraction data
+        val prefilled = _uiState.value.copy(
+            phoneNumber = initialPhone ?: _uiState.value.phoneNumber,
+            firstName = initialFirstName ?: _uiState.value.firstName,
+            lastName = initialLastName ?: _uiState.value.lastName
+        )
+        _uiState.value = prefilled
+
         if (customerId != null) {
             loadExisting(customerId)
         }
@@ -96,6 +107,7 @@ class CustomerFormViewModel @Inject constructor(
 
     fun save(onSuccess: (String) -> Unit) {
         val state = _uiState.value
+        if (state.isSaving) return // Guard check to prevent double clicks
 
         // Validation per plan: first name, last name, phone required
         if (state.firstName.isBlank() || state.lastName.isBlank()) {

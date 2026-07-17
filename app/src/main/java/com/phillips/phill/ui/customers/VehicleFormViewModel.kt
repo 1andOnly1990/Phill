@@ -39,13 +39,26 @@ class VehicleFormViewModel @Inject constructor(
 
     private var existingVehicle: VehicleEntity? = null
 
-    fun initialize(customerId: String, vehicleId: String?) {
+    fun initialize(
+        customerId: String,
+        vehicleId: String?,
+        initialYear: String? = null,
+        initialMake: String? = null,
+        initialModel: String? = null
+    ) {
         if (initialized) return
         initialized = true
         this.customerId = customerId
         this.vehicleId = vehicleId
         if (vehicleId != null) {
             loadExisting(vehicleId)
+        } else if (initialMake != null || initialModel != null) {
+            // Pre-fill from extraction chip
+            _uiState.value = VehicleFormUiState(
+                year = initialYear ?: "",
+                make = initialMake ?: "",
+                model = initialModel ?: ""
+            )
         }
     }
 
@@ -78,6 +91,7 @@ class VehicleFormViewModel @Inject constructor(
 
     fun save(onSuccess: () -> Unit) {
         val state = _uiState.value
+        if (state.isSaving) return // Guard check to prevent double clicks
 
         if (state.make.isBlank() || state.model.isBlank()) {
             _uiState.value = state.copy(makeModelError = "Make and model are required")

@@ -7,6 +7,7 @@ import com.phillips.phill.data.repository.BillingRepository
 import com.phillips.phill.data.repository.CustomerRepository
 import com.phillips.phill.data.repository.JobRepository
 import com.phillips.phill.data.repository.OperationsRepository
+import com.phillips.phill.domain.billing.BillingEngine
 import com.phillips.phill.domain.enums.JobStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,8 @@ data class AnalyticsUiState(
     val totalActualSeconds: Long = 0L,
     val completedJobCount: Int = 0,
     val hasClockData: Boolean = false,
+    val mileageDeductionCents: Long = 0L,
+    val mileageRateCentsPerMile: Int = 70,
     val isLoading: Boolean = true
 )
 
@@ -91,6 +94,8 @@ class AnalyticsViewModel @Inject constructor(
                     .filter { it.recordedAtEpoch in startOfMonth..endOfDay }
                     .sumOf { it.miles }
 
+                val mileageDeduction = BillingEngine.calculateMileageDeduction(monthMiles)
+
                 // --- Revenue ---
                 val todayRevenue = allPayments
                     .filter { it.paidAtEpoch in startOfDay..endOfDay }
@@ -138,6 +143,8 @@ class AnalyticsViewModel @Inject constructor(
                     totalActualSeconds = totalSeconds,
                     completedJobCount = completedJobEntities.size,
                     hasClockData = hasClockData,
+                    mileageDeductionCents = mileageDeduction,
+                    mileageRateCentsPerMile = BillingEngine.IRS_MILEAGE_RATE_CENTS_2025,
                     isLoading = false
                 ) to completedJobEntities
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _uiState.value to emptyList())

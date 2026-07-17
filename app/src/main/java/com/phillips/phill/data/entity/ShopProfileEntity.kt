@@ -33,5 +33,11 @@ data class ShopProfileEntity(
     @ColumnInfo(name = "auto_reply_message")
     val autoReplyMessage: String? = null,
     @ColumnInfo(name = "business_hours_json")
-    val businessHoursJson: String? = null
+    val businessHoursJson: String? = null,
+    @ColumnInfo(name = "parts_markup_mode", defaultValue = "SLIDING")
+    val partsMarkupMode: String = "SLIDING",
+    @ColumnInfo(name = "markup_tiers_json")
+    val markupTiersJson: String? = null,
+    @ColumnInfo(name = "mileage_rate_cents", defaultValue = "70")
+    val mileageRateCents: Int = 70
 )

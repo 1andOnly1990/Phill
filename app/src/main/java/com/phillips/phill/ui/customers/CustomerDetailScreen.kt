@@ -124,6 +124,30 @@ fun CustomerDetailScreen(
                 )
             }
 
+            // --- Aging Breakdown (only if there's outstanding balance) ---
+            if (state.outstandingBalanceCents > 0) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "Aging Breakdown",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        AgingRow("Current", state.currentAgingCents)
+                        AgingRow("30 Days", state.aging30Cents)
+                        AgingRow("60 Days", state.aging60Cents)
+                        AgingRow("90+ Days", state.aging90PlusCents, isOverdue = true)
+                    }
+                }
+            }
+
             // --- Vehicles ---
             SectionCard("Vehicles") {
                 if (state.vehicles.isEmpty()) {
@@ -271,5 +295,28 @@ private fun VehicleRow(vehicle: VehicleEntity, onEdit: () -> Unit) {
         IconButton(onClick = onEdit) {
             Icon(Icons.Filled.Edit, contentDescription = "Edit Vehicle")
         }
+    }
+}
+
+@Composable
+private fun AgingRow(label: String, cents: Long, isOverdue: Boolean = false) {
+    if (cents <= 0L) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            BillingEngine.formatCents(cents),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+        )
     }
 }

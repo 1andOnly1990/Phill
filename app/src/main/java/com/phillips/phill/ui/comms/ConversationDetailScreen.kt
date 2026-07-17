@@ -58,7 +58,14 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,8 +73,9 @@ import androidx.compose.ui.platform.LocalContext
 fun ConversationDetailScreen(
     conversationId: String,
     onNavigateBack: () -> Unit,
-    onCreateCustomer: (String) -> Unit,
+    onCreateCustomer: (phone: String, firstName: String?, lastName: String?) -> Unit,
     onScheduleAppointment: (String) -> Unit,
+    onAddVehicle: (customerId: String, year: String?, make: String?, model: String?) -> Unit,
     viewModel: ConversationDetailViewModel = hiltViewModel(key = conversationId)
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -184,7 +192,15 @@ fun ConversationDetailScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(
-                                onClick = { onCreateCustomer(conversation.phoneNumber) },
+                                onClick = {
+                                    // Pre-fill with extracted name if available
+                                    val extractedName = state.extractedData.names.firstOrNull()
+                                    onCreateCustomer(
+                                        conversation.phoneNumber,
+                                        extractedName?.firstName,
+                                        extractedName?.lastName
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(Icons.Filled.PersonAdd, contentDescription = null)
@@ -216,6 +232,97 @@ fun ConversationDetailScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Extraction chips — show detected data from inbound messages
+            val extracted = state.extractedData
+            if (extracted.vehicles.isNotEmpty() || extracted.symptoms.isNotEmpty() || extracted.appointmentIntent) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    extracted.vehicles.forEach { vehicle ->
+                        val label = listOfNotNull(vehicle.year?.toString(), vehicle.make, vehicle.model).joinToString(" ")
+                        AssistChip(
+                            onClick = {
+                                val custId = customer?.id
+                                if (custId != null) {
+                                    onAddVehicle(
+                                        custId,
+                                        vehicle.year?.toString(),
+                                        vehicle.make,
+                                        vehicle.model
+                                    )
+                                } else {
+                                    // No customer yet — create one first with extracted name
+                                    val extractedName = extracted.names.firstOrNull()
+                                    onCreateCustomer(
+                                        conversation?.phoneNumber ?: "",
+                                        extractedName?.firstName,
+                                        extractedName?.lastName
+                                    )
+                                }
+                            },
+                            label = { Text(label, maxLines = 1) },
+                            leadingIcon = { Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.padding(0.dp)) }
+                        )
+                    }
+                    extracted.symptoms.forEach { symptom ->
+                        AssistChip(
+                            onClick = { viewModel.addSymptomNote(symptom.text) },
+                            label = { Text(symptom.text, maxLines = 1) },
+                            leadingIcon = { Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.padding(0.dp)) }
+                        )
+                    }
+                    if (extracted.appointmentIntent) {
+                        AssistChip(
+                            onClick = {
+                                val custId = customer?.id
+                                if (custId != null) {
+                                    onScheduleAppointment(custId)
+                                } else {
+                                    // Create customer first
+                                    val extractedName = extracted.names.firstOrNull()
+                                    onCreateCustomer(
+                                        conversation?.phoneNumber ?: "",
+                                        extractedName?.firstName,
+                                        extractedName?.lastName
+                                    )
+                                }
+                            },
+                            label = { Text("Wants Appointment", maxLines = 1) },
+                            leadingIcon = { Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.padding(0.dp)) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                labelColor = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        )
+                    }
+                    // Name chip — shows extracted names, tapping navigates to customer form
+                    extracted.names.forEach { name ->
+                        val nameLabel = listOfNotNull(name.firstName, name.lastName).joinToString(" ")
+                        AssistChip(
+                            onClick = {
+                                if (customer == null) {
+                                    onCreateCustomer(
+                                        conversation?.phoneNumber ?: "",
+                                        name.firstName,
+                                        name.lastName
+                                    )
+                                }
+                            },
+                            label = { Text(nameLabel, maxLines = 1) },
+                            leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = null, modifier = Modifier.padding(0.dp)) },
+                            colors = if (customer == null) AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                labelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ) else AssistChipDefaults.assistChipColors()
+                        )
                     }
                 }
             }

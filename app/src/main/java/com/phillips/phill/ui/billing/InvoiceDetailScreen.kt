@@ -37,9 +37,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import android.content.Intent
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.phillips.phill.domain.billing.BillingEngine
 import com.phillips.phill.domain.enums.PaymentMethod
@@ -56,8 +59,28 @@ fun InvoiceDetailScreen(
     viewModel: InvoiceDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     LaunchedEffect(Unit) { viewModel.initialize(invoiceId) }
     val invoice = state.invoice
+
+    // Handle PDF ready -> launch share intent
+    LaunchedEffect(state.pdfReady) {
+        if (state.pdfReady && state.pdfFile != null) {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                state.pdfFile!!
+            )
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                putExtra(Intent.EXTRA_SUBJECT, "Invoice ${invoice?.invoiceNumber ?: ""}")
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "Share Invoice"))
+            viewModel.clearPdfState()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -155,6 +178,19 @@ fun InvoiceDetailScreen(
                     Icon(Icons.Filled.Payment, contentDescription = null)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("  Log Payment")
+                }
+            }
+
+            // Share / Preview buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { viewModel.generatePdf(context) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Share Invoice")
                 }
             }
         }

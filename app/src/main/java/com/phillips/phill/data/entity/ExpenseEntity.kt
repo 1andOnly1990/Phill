@@ -27,5 +27,7 @@ data class ExpenseEntity(
     val vendor: String? = null,
     @ColumnInfo(name = "date_epoch")
     val dateEpoch: Long = System.currentTimeMillis(),
-    val notes: String? = null
+    val notes: String? = null,
+    @ColumnInfo(name = "receipt_uri")
+    val receiptUri: String? = null
 )

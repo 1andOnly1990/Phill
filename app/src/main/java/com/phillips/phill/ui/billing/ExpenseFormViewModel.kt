@@ -22,7 +22,8 @@ data class ExpenseFormUiState(
     val notes: String = "",
     val isEditMode: Boolean = false,
     val isSaving: Boolean = false,
-    val validationError: String? = null
+    val validationError: String? = null,
+    val receiptUri: String? = null
 )
 
 @HiltViewModel
@@ -59,7 +60,8 @@ class ExpenseFormViewModel @Inject constructor(
                 vendor = expense.vendor ?: "",
                 category = expense.category,
                 notes = expense.notes ?: "",
-                isEditMode = true
+                isEditMode = true,
+                receiptUri = expense.receiptUri
             )
         }
     }
@@ -70,8 +72,18 @@ class ExpenseFormViewModel @Inject constructor(
     fun updateCategory(category: ExpenseCategory) { _uiState.value = _uiState.value.copy(category = category) }
     fun updateNotes(value: String) { _uiState.value = _uiState.value.copy(notes = value) }
 
+    fun attachReceipt(uri: String) {
+        _uiState.value = _uiState.value.copy(receiptUri = uri)
+    }
+
+    fun removeReceipt() {
+        _uiState.value = _uiState.value.copy(receiptUri = null)
+    }
+
     fun save(onSuccess: () -> Unit) {
         val state = _uiState.value
+        if (state.isSaving) return // Guard check to prevent double clicks
+
         val amountCents = BillingEngine.parseDollarsToCents(state.amountDisplay)
         if (amountCents == null || amountCents <= 0) {
             _uiState.value = state.copy(validationError = "Enter a valid amount")
@@ -91,7 +103,8 @@ class ExpenseFormViewModel @Inject constructor(
                     description = state.description.trim(),
                     vendor = state.vendor.trim().ifBlank { null },
                     category = state.category,
-                    notes = state.notes.trim().ifBlank { null }
+                    notes = state.notes.trim().ifBlank { null },
+                    receiptUri = state.receiptUri
                 )
             } else {
                 ExpenseEntity(
@@ -101,7 +114,8 @@ class ExpenseFormViewModel @Inject constructor(
                     vendor = state.vendor.trim().ifBlank { null },
                     category = state.category,
                     dateEpoch = System.currentTimeMillis(),
-                    notes = state.notes.trim().ifBlank { null }
+                    notes = state.notes.trim().ifBlank { null },
+                    receiptUri = state.receiptUri
                 )
             }
 

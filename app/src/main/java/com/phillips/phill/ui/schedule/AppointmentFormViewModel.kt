@@ -160,6 +160,7 @@ class AppointmentFormViewModel @Inject constructor(
 
     fun save(onSuccess: () -> Unit) {
         val state = _uiState.value
+        if (state.isSaving) return // Guard check to prevent double clicks
 
         if (state.selectedCustomer == null) {
             _uiState.value = state.copy(validationError = "Please select a customer")

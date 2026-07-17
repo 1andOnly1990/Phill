@@ -13,6 +13,7 @@ import com.phillips.phill.data.repository.OperationsRepository
 import com.phillips.phill.domain.billing.BillingEngine
 import com.phillips.phill.domain.billing.InvoiceTotals
 import com.phillips.phill.domain.billing.LineItemTotal
+import com.phillips.phill.domain.billing.MarkupTier
 import com.phillips.phill.domain.enums.InvoiceStatus
 import com.phillips.phill.domain.enums.LineItemType
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,6 +44,8 @@ data class InvoiceBuilderUiState(
     val serviceFeeCentsDisplay: String = "60.00",
     val laborRateCents: Long = 12500L,
     val partsMarkupBasisPoints: Int = 14000,
+    val partsMarkupMode: String = "SLIDING",
+    val markupTiers: List<MarkupTier> = BillingEngine.DEFAULT_MARKUP_TIERS,
     val taxRateBasisPoints: Int = 600,
     val totals: InvoiceTotals = InvoiceTotals(0, 0, 0, 0, 0, 0, 0),
     val legalClause: String = "Estimate valid for 30 days. Customer authorizes the described repairs. All parts and labor guaranteed for 12 months or 12,000 miles, whichever comes first.",
@@ -110,6 +113,8 @@ class InvoiceBuilderViewModel @Inject constructor(
                 serviceFeeCentsDisplay = BillingEngine.formatCents(profile.serviceFeeCents).removePrefix("$"),
                 laborRateCents = profile.laborRateCents,
                 partsMarkupBasisPoints = profile.partsMarkupBasisPoints,
+                partsMarkupMode = profile.partsMarkupMode,
+                markupTiers = BillingEngine.deserializeTiers(profile.markupTiersJson),
                 taxRateBasisPoints = profile.taxRateBasisPoints,
                 isLoaded = true
             )
@@ -158,6 +163,8 @@ class InvoiceBuilderViewModel @Inject constructor(
             serviceFeeCentsDisplay = BillingEngine.formatCents(invoice.serviceFeeCents).removePrefix("$"),
             laborRateCents = profile.laborRateCents,
             partsMarkupBasisPoints = profile.partsMarkupBasisPoints,
+            partsMarkupMode = profile.partsMarkupMode,
+            markupTiers = BillingEngine.deserializeTiers(profile.markupTiersJson),
             taxRateBasisPoints = profile.taxRateBasisPoints,
             legalClause = invoice.termsText ?: InvoiceBuilderUiState().legalClause,
             isLoaded = true,
@@ -216,6 +223,14 @@ class InvoiceBuilderViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(legalClause = value)
     }
 
+    private fun applyMarkup(costCents: Long, state: InvoiceBuilderUiState): Long {
+        return if (state.partsMarkupMode == "SLIDING") {
+            BillingEngine.applySlidingScaleMarkup(costCents, state.markupTiers)
+        } else {
+            BillingEngine.applyPartsMarkup(costCents, state.partsMarkupBasisPoints)
+        }
+    }
+
     private fun recalculate() {
         val state = _uiState.value
         val serviceFeeCents = BillingEngine.parseDollarsToCents(state.serviceFeeCentsDisplay) ?: 0L
@@ -224,9 +239,9 @@ class InvoiceBuilderViewModel @Inject constructor(
             val qty = BillingEngine.parseHoursToThousandths(item.quantityDisplay) ?: return@mapNotNull null
             val price = BillingEngine.parseDollarsToCents(item.unitPriceDisplay) ?: return@mapNotNull null
 
-            // Apply parts markup if PARTS type
+            // Apply parts markup (sliding or flat) if PARTS type
             val effectivePrice = if (item.type == LineItemType.PARTS) {
-                BillingEngine.applyPartsMarkup(price, state.partsMarkupBasisPoints)
+                applyMarkup(price, state)
             } else {
                 price
             }
@@ -257,6 +272,8 @@ class InvoiceBuilderViewModel @Inject constructor(
 
     private fun save(status: InvoiceStatus, onSuccess: () -> Unit) {
         val state = _uiState.value
+        if (state.isSaving) return // Guard check to prevent double clicks
+
         _uiState.value = state.copy(isSaving = true)
 
         viewModelScope.launch {
@@ -285,7 +302,7 @@ class InvoiceBuilderViewModel @Inject constructor(
                 val rawPrice = BillingEngine.parseDollarsToCents(item.unitPriceDisplay) ?: return@mapIndexedNotNull null
 
                 val effectivePrice = if (item.type == LineItemType.PARTS) {
-                    BillingEngine.applyPartsMarkup(rawPrice, state.partsMarkupBasisPoints)
+                    applyMarkup(rawPrice, state)
                 } else {
                     rawPrice
                 }

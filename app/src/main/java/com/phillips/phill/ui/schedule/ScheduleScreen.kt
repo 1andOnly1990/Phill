@@ -1,11 +1,13 @@
 package com.phillips.phill.ui.schedule
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -132,8 +138,28 @@ fun ScheduleScreen(
                 }
             }
 
+            val zone = ZoneId.systemDefault()
+            val displayAppointments = if (viewMode == ScheduleViewMode.MONTH) {
+                appointments.filter { appt ->
+                    Instant.ofEpochMilli(appt.scheduledStartEpoch)
+                        .atZone(zone)
+                        .toLocalDate() == selectedDate
+                }
+            } else {
+                appointments
+            }
+
+            if (viewMode == ScheduleViewMode.MONTH) {
+                CalendarGrid(
+                    selectedDate = selectedDate,
+                    appointments = appointments,
+                    onDateSelected = { viewModel.navigateToDate(it) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // --- Appointment list ---
-            if (appointments.isEmpty()) {
+            if (displayAppointments.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -159,7 +185,7 @@ fun ScheduleScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(appointments, key = { it.id }) { appointment ->
+                    items(displayAppointments, key = { it.id }) { appointment ->
                         AppointmentCard(
                             appointment = appointment,
                             viewModel = viewModel,
@@ -283,5 +309,129 @@ private fun formatDateHeader(date: LocalDate, mode: ScheduleViewMode): String {
             "${weekStart.format(DateTimeFormatter.ofPattern("MMM d"))} – ${weekEnd.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}"
         }
         ScheduleViewMode.MONTH -> date.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+    }
+}
+
+@Composable
+private fun CalendarGrid(
+    selectedDate: LocalDate,
+    appointments: List<AppointmentEntity>,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    val zone = ZoneId.systemDefault()
+    val appointmentsByDate = appointments.groupBy { appt ->
+        Instant.ofEpochMilli(appt.scheduledStartEpoch).atZone(zone).toLocalDate()
+    }
+
+    val firstOfMonth = selectedDate.withDayOfMonth(1)
+    val firstDayOfWeek = firstOfMonth.dayOfWeek.value // 1 (Mon) to 7 (Sun)
+    val prefixDays = if (firstDayOfWeek == 7) 0 else firstDayOfWeek
+    val daysInMonth = selectedDate.lengthOfMonth()
+
+    val cells = mutableListOf<LocalDate?>()
+    repeat(prefixDays) { cells.add(null) }
+    for (day in 1..daysInMonth) {
+        cells.add(firstOfMonth.withDayOfMonth(day))
+    }
+    val totalCells = cells.size
+    val suffixDays = (7 - (totalCells % 7)) % 7
+    repeat(suffixDays) { cells.add(null) }
+
+    val rows = cells.chunked(7)
+    val weekDays = listOf("S", "M", "T", "W", "T", "F", "S")
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                shape = MaterialTheme.shapes.medium
+            )
+            .padding(8.dp)
+    ) {
+        // Weekday headers
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            weekDays.forEach { day ->
+                Text(
+                    text = day,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Calendar rows
+        rows.forEach { week ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                week.forEach { date ->
+                    if (date != null) {
+                        val isSelected = date == selectedDate
+                        val isToday = date == LocalDate.now()
+                        val hasAppointments = appointmentsByDate.containsKey(date)
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .padding(2.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                    else if (isToday) MaterialTheme.colorScheme.surfaceVariant
+                                    else Color.Transparent
+                                )
+                                .clickable { onDateSelected(date) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = date.dayOfMonth.toString(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else if (isToday) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (hasAppointments) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .width(4.dp)
+                                            .height(4.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                                else MaterialTheme.colorScheme.tertiary
+                                            )
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .padding(2.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }

@@ -6,6 +6,7 @@ import com.phillips.phill.data.entity.ConversationEntity
 import com.phillips.phill.data.entity.MessageEntity
 import com.phillips.phill.data.repository.CommsRepository
 import com.phillips.phill.domain.enums.MessageStatus
+import com.phillips.phill.util.PhoneNumberUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,12 +21,21 @@ class SmsSyncManager @Inject constructor(
 ) {
     companion object {
         /**
-         * Minimum digit count for a real phone number.
-         * Anything with fewer than 7 digits is a short code (spam, verification, marketing).
-         * Examples of short codes: "69534" (5 digits), "778273" (6 digits).
-         * Real US numbers have 10 digits; international has more.
+         * Minimum digit count delegated to PhoneNumberUtils.MIN_REAL_PHONE_DIGITS.
          */
-        private const val MIN_REAL_PHONE_DIGITS = 7
+
+        /**
+         * Carrier error messages that Android stores as type=1 (INBOX).
+         * These are NOT real inbound messages — filter them out during sync.
+         */
+        private val CARRIER_ERROR_PREFIXES = listOf(
+            "Text messaging service has been denied",
+            "Message not sent",
+            "Unable to send",
+            "Free msg: unable to send",
+            "Message failed",
+            "Service denied"
+        )
     }
 
     /**
@@ -81,16 +91,14 @@ class SmsSyncManager @Inject constructor(
             }
         }
 
-        // Group by normalized phone number (digits only, last 10 for 10-digit numbers)
-        val grouped = allMessages.groupBy { it.address.filter { c -> c.isDigit() }.takeLast(10) }
+        // Group by normalized phone number
+        val grouped = allMessages.groupBy { PhoneNumberUtils.normalize(it.address) }
 
         for ((normalizedPhone, messages) in grouped) {
             if (messages.isEmpty()) continue
 
-            // --- FILTER 1: Short code check ---
-            // If normalized number has fewer than MIN_REAL_PHONE_DIGITS digits, skip.
-            // Short codes are 5–6 digit numbers used by spam, marketing, and 2FA services.
-            if (normalizedPhone.length < MIN_REAL_PHONE_DIGITS) continue
+            // --- FILTER 1: Short code / toll-free check ---
+            if (PhoneNumberUtils.isTollFreeOrShortCode(normalizedPhone)) continue
 
             // --- FILTER 2: Known personal contact check ---
             // If this number is saved in the device contacts, it is a personal contact.
@@ -108,6 +116,9 @@ class SmsSyncManager @Inject constructor(
                 val exists = existingMessages.any { existing ->
                     existing.body == sms.body && Math.abs(existing.timestampEpoch - sms.date) < 5000
                 }
+
+                // --- FILTER: Carrier error messages stored as inbox type ---
+                if (CARRIER_ERROR_PREFIXES.any { prefix -> sms.body.startsWith(prefix, ignoreCase = true) }) continue
 
                 if (!exists) {
                     val message = MessageEntity(
@@ -152,7 +163,7 @@ class SmsSyncManager @Inject constructor(
         )
 
         val selection = "${Telephony.Sms.ADDRESS} LIKE ?"
-        val selectionArgs = arrayOf("%${phoneNumber.filter { it.isDigit() }.takeLast(10)}")
+        val selectionArgs = arrayOf("%${PhoneNumberUtils.normalize(phoneNumber)}")
 
         val cursor = context.contentResolver.query(
             uri,
@@ -171,6 +182,10 @@ class SmsSyncManager @Inject constructor(
 
             while (it.moveToNext()) {
                 val body = it.getString(bodyIndex) ?: continue
+
+                // --- FILTER: Carrier error messages stored as inbox type ---
+                if (CARRIER_ERROR_PREFIXES.any { prefix -> body.startsWith(prefix, ignoreCase = true) }) continue
+
                 val date = it.getLong(dateIndex)
                 val type = it.getInt(typeIndex)
                 val isInbound = type == Telephony.Sms.MESSAGE_TYPE_INBOX

@@ -4,9 +4,11 @@ import android.app.Notification
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import com.phillips.phill.data.entity.MessageEntity
 import com.phillips.phill.data.repository.CommsRepository
 import com.phillips.phill.domain.enums.MessageStatus
+import com.phillips.phill.util.PhoneNumberUtils
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -47,6 +49,16 @@ import kotlin.math.abs
  *   4. Title matches phone pattern → use as number
  *   5. LAST RESORT: generate GOOG_<hash>, flag needsReview=true
  *
+ * ## Google Caller ID Resolution
+ * When Google Messages replaces a phone number with a caller-ID name (common
+ * with RCS), Step 5 fires and we store a GOOG_<hash> conversation. On every
+ * inbound message we attempt to resolve the GOOG_ conversation to a real phone
+ * by checking:
+ *   a) The notification subText (Google Messages sometimes puts the real number there)
+ *   b) The contact resolver (Android contacts may map the display name to a number)
+ *   c) SMS that arrived from the same person (SmsReceiver stores the real phone)
+ * If resolved, the GOOG_ conversation is merged into the real-phone conversation.
+ *
  * Uses @EntryPoint for Hilt injection (per peer review fix #7 — safer than
  * @AndroidEntryPoint for NotificationListenerService lifecycle).
  */
@@ -61,13 +73,14 @@ class RcsNotificationListener : NotificationListenerService() {
     }
 
     companion object {
-        private const val MIN_REAL_PHONE_DIGITS = 7
+        private const val TAG = "PhillRcsListener"
         private const val DEDUP_WINDOW_MS = 10_000L // ±10 seconds
 
         /** Messaging app package names to monitor. */
         private val MONITORED_PACKAGES = setOf(
             "com.google.android.apps.messaging",  // Google Messages
-            "com.samsung.android.messaging"         // Samsung Messages
+            "com.samsung.android.messaging",        // Samsung Messages
+            "com.google.android.dialer"              // Google Dialer (Caller ID)
         )
 
         /** Matches strings that look like phone numbers. */
@@ -77,12 +90,51 @@ class RcsNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
 
+        Log.d(TAG, "onNotificationPosted: pkg=${sbn.packageName} tag=${sbn.tag} id=${sbn.id}")
+
         // Filter: only monitor known messaging apps
-        if (sbn.packageName !in MONITORED_PACKAGES) return
+        if (sbn.packageName !in MONITORED_PACKAGES) {
+            Log.v(TAG, "Skipping non-monitored package: ${sbn.packageName}")
+            return
+        }
+
+        Log.i(TAG, "Processing notification from ${sbn.packageName}")
+
+        // For Google Dialer (Caller ID), log the notification details but don't store as message
+        if (sbn.packageName == "com.google.android.dialer") {
+            val extras = sbn.notification?.extras ?: return
+            val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+            val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+            val subText = extras.getCharSequence("android.subText")?.toString()
+            Log.i(TAG, "CALLER_ID: title=$title text=$text subText=$subText tag=${sbn.tag}")
+            // TODO: Could store caller ID info in a separate table for enrichment
+            return
+        }
 
         val extras = sbn.notification?.extras ?: return
         val body = extractBody(extras)
-        if (body.isNullOrBlank()) return
+        if (body.isNullOrBlank()) {
+            Log.d(TAG, "Empty body, skipping")
+            return
+        }
+
+        // Android 15+ (API 35) marks messaging notifications as "sensitive content",
+        // redacting the body and extras from NotificationListenerService.
+        // When this happens, the body is replaced with system text like
+        // "Sensitive notification content hidden" or "Messages is doing work in the background".
+        // Skip these — the SmsReceiver handles SMS directly; this listener is only
+        // needed for genuine RCS messages with readable content.
+        val redactedPatterns = listOf(
+            "Sensitive notification content hidden",
+            "Messages is doing work in the background",
+            "Checking messages"
+        )
+        if (redactedPatterns.any { body.contains(it, ignoreCase = true) }) {
+            Log.d(TAG, "Skipping redacted/system notification: ${body.take(60)}")
+            return
+        }
+
+        Log.d(TAG, "Message body: ${body.take(50)}...")
 
         val entryPoint = EntryPointAccessors.fromApplication(
             applicationContext, RcsListenerEntryPoint::class.java
@@ -99,23 +151,59 @@ class RcsNotificationListener : NotificationListenerService() {
             val displayName = extractionResult.second
             val isHashFallback = extractionResult.third
 
-            // Normalize
-            val normalizedSender = rawSender.filter { it.isDigit() }.takeLast(10)
+            Log.i(TAG, "Extracted: sender=$rawSender displayName=$displayName isHash=$isHashFallback")
 
-            // Filter 1: Short code check (unless hash fallback)
-            if (!isHashFallback && normalizedSender.length < MIN_REAL_PHONE_DIGITS) return@launch
+            // Normalize using centralized PhoneNumberUtils
+            val normalizedSender = PhoneNumberUtils.normalize(rawSender)
+
+            // Filter 1: Short code / toll-free check (PhoneNumberUtils handles GOOG_ correctly)
+            if (!isHashFallback && PhoneNumberUtils.isTollFreeOrShortCode(rawSender)) {
+                Log.d(TAG, "Filtered: short code/toll-free ($normalizedSender)")
+                return@launch
+            }
 
             // Filter 2: Known personal contact
-            if (!isHashFallback && contactResolver.isKnownContact(rawSender)) return@launch
+            if (!isHashFallback && contactResolver.isKnownContact(rawSender)) {
+                Log.d(TAG, "Filtered: known contact ($rawSender)")
+                return@launch
+            }
+
+            // ── Google Caller ID Resolution ──────────────────────────────
+            // If this is a GOOG_ hash (Google replaced the phone number with a name),
+            // attempt to resolve back to a real phone number.
+            var resolvedPhone: String? = null
+            if (isHashFallback && displayName != null) {
+                resolvedPhone = tryResolveGoogleCallerId(
+                    extras, displayName, contactResolver
+                )
+                if (resolvedPhone != null) {
+                    Log.i(TAG, "RESOLVED GOOG_ '$displayName' → $resolvedPhone")
+                }
+            }
+
+            // Determine the conversation phone to use
+            val conversationPhone = resolvedPhone ?: normalizedSender
 
             // Get or create conversation
             val conversation = commsRepository.getOrCreateConversation(
-                phone = if (isHashFallback) rawSender else normalizedSender,
+                phone = conversationPhone,
                 displayName = displayName
             )
 
-            // If hash fallback, update conversation to flag for review
-            if (isHashFallback && !conversation.needsReview) {
+            // If we just resolved a GOOG_ to a real phone, merge any existing GOOG_ conversation
+            if (resolvedPhone != null) {
+                val googConvo = commsRepository.getConversationByPhone(normalizedSender)
+                if (googConvo != null && googConvo.id != conversation.id) {
+                    Log.i(TAG, "MERGING GOOG_ conversation ${googConvo.id} → ${conversation.id}")
+                    commsRepository.mergeConversations(
+                        keepId = conversation.id,
+                        mergeId = googConvo.id
+                    )
+                }
+            }
+
+            // If still a hash fallback (couldn't resolve), flag for review
+            if (isHashFallback && resolvedPhone == null && !conversation.needsReview) {
                 commsRepository.saveConversation(
                     conversation.copy(needsReview = true, source = "RCS")
                 )
@@ -127,9 +215,13 @@ class RcsNotificationListener : NotificationListenerService() {
             val isDuplicate = existingMessages.any { msg ->
                 msg.body == body && abs(msg.timestampEpoch - now) < DEDUP_WINDOW_MS
             }
-            if (isDuplicate) return@launch
+            if (isDuplicate) {
+                Log.d(TAG, "Filtered: duplicate message")
+                return@launch
+            }
 
             // Store inbound message
+            Log.i(TAG, "STORING message in conversation ${conversation.id} from $conversationPhone")
             val message = MessageEntity(
                 conversationId = conversation.id,
                 body = body,
@@ -155,11 +247,29 @@ class RcsNotificationListener : NotificationListenerService() {
 
     /**
      * Extracts the message body from notification extras.
+     * Filters out Google Messages reaction/quote notifications that are not real messages.
      */
     private fun extractBody(extras: Bundle): String? {
         // Try EXTRA_BIG_TEXT first (expanded notification), then EXTRA_TEXT
-        return extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+        val body = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+            ?: return null
+
+        // Filter Google Messages reaction/quote notifications.
+        // When someone reacts to or quotes a message, Google Messages sends a
+        // notification with body like 'Questioned "original message"' or '👍 message'.
+        // These are not real inbound messages and should be skipped.
+        val reactionPrefixes = listOf(
+            "Questioned \"", "Reacted ", "Liked \"", "Loved \"",
+            "Disliked \"", "Emphasized \"", "Laughed at \"",
+            "\uD83D\uDC4D ", "❤\uFE0F ", "\uD83D\uDE02 ", "\uD83D\uDE2E ", "\uD83D\uDE22 ", "\uD83D\uDE21 "
+        )
+        if (reactionPrefixes.any { body.startsWith(it) }) {
+            Log.d(TAG, "Filtered reaction/quote notification: ${body.take(40)}")
+            return null
+        }
+
+        return body
     }
 
     /**
@@ -219,7 +329,65 @@ class RcsNotificationListener : NotificationListenerService() {
         // Step 5: LAST RESORT — hash the title as a fallback identifier
         val fallbackName = title ?: sbn.key
         val hash = md5(fallbackName).take(8)
-        return Triple("GOOG_$hash", fallbackName, true)
+        return Triple("${PhoneNumberUtils.GOOGLE_ID_PREFIX}$hash", fallbackName, true)
+    }
+
+    /**
+     * Attempts to resolve a Google caller-ID display name back to a real phone number.
+     *
+     * Tries multiple strategies:
+     * 1. Check subText field — Google Messages sometimes puts the real phone there
+     * 2. Look up the display name in Android contacts
+     * 3. Look up by display name in existing Phill conversations
+     */
+    private suspend fun tryResolveGoogleCallerId(
+        extras: Bundle,
+        displayName: String,
+        contactResolver: ContactResolver
+    ): String? {
+        // Strategy 1: subText often contains the real phone even when title shows caller ID
+        val subText = extras.getCharSequence("android.subText")?.toString()
+        if (subText != null) {
+            val phone = Regex("[+]?[\\d\\-().\\s]{7,}").find(subText)
+            if (phone != null) {
+                val normalized = PhoneNumberUtils.normalize(phone.value)
+                if (!PhoneNumberUtils.isShortCode(normalized)) {
+                    Log.d(TAG, "Resolved via subText: $normalized")
+                    return normalized
+                }
+            }
+        }
+
+        // Strategy 2: Check android.messages bundle for any tel: URIs we might have missed
+        @Suppress("DEPRECATION")
+        val messages = extras.getParcelableArray("android.messages")
+        if (messages != null) {
+            for (msg in messages) {
+                if (msg is Bundle) {
+                    // Some messaging apps put the phone in "sender" even when title shows name
+                    val sender = msg.getCharSequence("sender")?.toString()
+                    if (sender != null) {
+                        val normalized = PhoneNumberUtils.normalize(sender)
+                        if (normalized.length >= PhoneNumberUtils.MIN_REAL_PHONE_DIGITS) {
+                            Log.d(TAG, "Resolved via message sender: $normalized")
+                            return normalized
+                        }
+                    }
+                }
+            }
+        }
+
+        // Strategy 3: Reverse-lookup display name in Android contacts
+        val contactPhone = contactResolver.getPhoneForName(displayName)
+        if (contactPhone != null) {
+            val normalized = PhoneNumberUtils.normalize(contactPhone)
+            if (!PhoneNumberUtils.isShortCode(normalized)) {
+                Log.d(TAG, "Resolved via contacts: $normalized")
+                return normalized
+            }
+        }
+
+        return null
     }
 
     /**

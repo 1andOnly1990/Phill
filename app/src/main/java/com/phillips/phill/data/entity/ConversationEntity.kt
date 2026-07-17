@@ -10,9 +10,11 @@ import java.util.UUID
 @Entity(
     tableName = "conversations",
     foreignKeys = [
-        ForeignKey(entity = CustomerEntity::class, parentColumns = ["id"], childColumns = ["customer_id"], onDelete = ForeignKey.SET_NULL)
+        ForeignKey(entity = CustomerEntity::class, parentColumns = ["id"], childColumns = ["customer_id"], onDelete = ForeignKey.SET_NULL),
+        ForeignKey(entity = JobEntity::class, parentColumns = ["id"], childColumns = ["job_id"], onDelete = ForeignKey.SET_NULL),
+        ForeignKey(entity = AppointmentEntity::class, parentColumns = ["id"], childColumns = ["appointment_id"], onDelete = ForeignKey.SET_NULL)
     ],
-    indices = [Index("customer_id"), Index("phone_number")]
+    indices = [Index("customer_id"), Index("phone_number"), Index("job_id"), Index("appointment_id")]
 )
 data class ConversationEntity(
     @PrimaryKey
@@ -32,5 +34,9 @@ data class ConversationEntity(
     @ColumnInfo(name = "needs_review", defaultValue = "0")
     val needsReview: Boolean = false,
     @ColumnInfo(name = "last_auto_reply_epoch")
-    val lastAutoReplyEpoch: Long? = null
+    val lastAutoReplyEpoch: Long? = null,
+    @ColumnInfo(name = "job_id")
+    val jobId: String? = null,
+    @ColumnInfo(name = "appointment_id")
+    val appointmentId: String? = null
 )

@@ -15,3 +15,10 @@
 local.properties
 *.apk
 *.pdf
+
+# D:\-SPECIFIC ARTIFACTS
+emulator.log
+monkey*.log
+hs_err_pid*.log
+replay_pid*.log
+.idea/

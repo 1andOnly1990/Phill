@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.RequestQuote
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +38,8 @@ fun MoreHubScreen(
     onCustomers: () -> Unit,
     onBilling: () -> Unit,
     onAnalytics: () -> Unit,
+    onProfitLoss: () -> Unit,
+    onTaxSummary: () -> Unit,
     onSettings: () -> Unit
 ) {
     Scaffold(
@@ -72,6 +76,18 @@ fun MoreHubScreen(
                 label = "Analytics",
                 subtitle = "Revenue trends and business overview",
                 onClick = onAnalytics
+            )
+            MoreMenuItem(
+                icon = Icons.Filled.AccountBalance,
+                label = "Profit & Loss",
+                subtitle = "Income statement and operating expenses",
+                onClick = onProfitLoss
+            )
+            MoreMenuItem(
+                icon = Icons.Filled.RequestQuote,
+                label = "Tax Summary",
+                subtitle = "Schedule C estimates and deductions",
+                onClick = onTaxSummary
             )
             MoreMenuItem(
                 icon = Icons.Filled.Settings,

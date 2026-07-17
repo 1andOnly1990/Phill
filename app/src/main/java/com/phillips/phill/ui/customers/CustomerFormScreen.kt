@@ -37,12 +37,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 fun CustomerFormScreen(
     customerId: String? = null,
     initialPhone: String? = null,
+    initialFirstName: String? = null,
+    initialLastName: String? = null,
     onNavigateBack: () -> Unit,
     onSaveSuccess: (String) -> Unit,
     viewModel: CustomerFormViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    LaunchedEffect(Unit) { viewModel.initialize(customerId, initialPhone) }
+    LaunchedEffect(Unit) { viewModel.initialize(customerId, initialPhone, initialFirstName, initialLastName) }
 
     Scaffold(
         topBar = {

@@ -4,9 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import android.util.Log
 import com.phillips.phill.data.entity.MessageEntity
 import com.phillips.phill.data.repository.CommsRepository
 import com.phillips.phill.domain.enums.MessageStatus
+import com.phillips.phill.util.PhoneNumberUtils
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +19,7 @@ import javax.inject.Inject
  * Receives inbound SMS messages and stores them in the local database.
  *
  * FILTERING RULES (message is ignored if ANY of these are true):
- *   1. Sender normalizes to fewer than 7 digits → short code (spam/verification/marketing)
+ *   1. Sender normalizes to fewer than 7 digits OR is a toll-free number → not a real customer
  *   2. Sender is found in Android Contacts → personal contact, not a business lead
  *
  * Only messages from unknown numbers (potential new customers) reach the Phill Comms tab.
@@ -38,13 +40,15 @@ class SmsReceiver : BroadcastReceiver() {
     lateinit var autoReplyManager: AutoReplyManager
 
     companion object {
-        private const val MIN_REAL_PHONE_DIGITS = 7
+        private const val TAG = "PhillSmsReceiver"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.i(TAG, "onReceive: action=${intent.action}")
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
+        Log.i(TAG, "Received ${messages.size} SMS parts")
 
         CoroutineScope(Dispatchers.IO).launch {
             val grouped = messages.groupBy { it.displayOriginatingAddress ?: "unknown" }
@@ -53,15 +57,33 @@ class SmsReceiver : BroadcastReceiver() {
                 val body = parts.joinToString("") { it.displayMessageBody ?: "" }
                 if (body.isBlank()) continue
 
-                // --- FILTER 1: Short code check ---
-                val normalizedSender = sender.filter { it.isDigit() }.takeLast(10)
-                if (normalizedSender.length < MIN_REAL_PHONE_DIGITS) continue
+                // --- FILTER 1: Short code / toll-free check ---
+                val normalizedSender = PhoneNumberUtils.normalize(sender)
+                if (PhoneNumberUtils.isTollFreeOrShortCode(sender)) {
+                    Log.d(TAG, "Filtered short code/toll-free: $sender")
+                    continue
+                }
 
                 // --- FILTER 2: Known personal contact check ---
-                if (contactResolver.isKnownContact(sender)) continue
+                if (contactResolver.isKnownContact(sender)) {
+                    Log.d(TAG, "Filtered known contact: $sender")
+                    continue
+                }
 
                 // --- PASSED FILTERS: Store as potential business lead ---
+                Log.i(TAG, "STORING SMS from $normalizedSender: ${body.take(50)}...")
                 val conversation = commsRepository.getOrCreateConversation(normalizedSender)
+
+                // Deduplication: check for same body within ±10 seconds
+                val existingMessages = commsRepository.getMessagesByConversationIdSync(conversation.id)
+                val now = System.currentTimeMillis()
+                val isDuplicate = existingMessages.any { msg ->
+                    msg.body == body && kotlin.math.abs(msg.timestampEpoch - now) < 10_000L
+                }
+                if (isDuplicate) {
+                    Log.d(TAG, "Filtered duplicate SMS from $normalizedSender")
+                    continue
+                }
 
                 val message = MessageEntity(
                     conversationId = conversation.id,

@@ -27,6 +27,11 @@ data class CustomerDetailUiState(
     val jobs: List<JobEntity> = emptyList(),
     val invoices: List<InvoiceEntity> = emptyList(),
     val outstandingBalanceCents: Long = 0L,
+    val currentAgingCents: Long = 0L,
+    val aging30Cents: Long = 0L,
+    val aging60Cents: Long = 0L,
+    val aging90PlusCents: Long = 0L,
+    val unpaidInvoices: List<InvoiceEntity> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -64,9 +69,28 @@ class CustomerDetailViewModel @Inject constructor(
                 jobRepository.observeByCustomer(customerId),
                 billingRepository.observeInvoicesByCustomer(customerId)
             ) { vehicles, jobs, invoices ->
-                val outstandingBalance = invoices
-                    .filter { it.status == InvoiceStatus.INVOICE }
-                    .sumOf { it.totalCents }
+                val unpaid = invoices.filter { it.status == InvoiceStatus.INVOICE }
+                val outstandingBalance = unpaid.sumOf { it.totalCents }
+
+                // Aging buckets based on finalization date
+                val now = System.currentTimeMillis()
+                val day30 = 30L * 24 * 60 * 60 * 1000
+                val day60 = 60L * 24 * 60 * 60 * 1000
+                val day90 = 90L * 24 * 60 * 60 * 1000
+
+                var current = 0L
+                var over30 = 0L
+                var over60 = 0L
+                var over90 = 0L
+                for (inv in unpaid) {
+                    val age = now - (inv.finalizedAtEpoch ?: inv.createdAtEpoch)
+                    when {
+                        age >= day90 -> over90 += inv.totalCents
+                        age >= day60 -> over60 += inv.totalCents
+                        age >= day30 -> over30 += inv.totalCents
+                        else -> current += inv.totalCents
+                    }
+                }
 
                 CustomerDetailUiState(
                     customer = customer,
@@ -74,6 +98,11 @@ class CustomerDetailViewModel @Inject constructor(
                     jobs = jobs,
                     invoices = invoices,
                     outstandingBalanceCents = outstandingBalance,
+                    currentAgingCents = current,
+                    aging30Cents = over30,
+                    aging60Cents = over60,
+                    aging90PlusCents = over90,
+                    unpaidInvoices = unpaid,
                     isLoading = false
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _uiState.value)

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,11 +30,14 @@ import com.phillips.phill.domain.enums.JobStatus
 import com.phillips.phill.sms.SmsSyncManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 import androidx.core.content.FileProvider
 import com.phillips.phill.data.dao.AttachmentDao
 import com.phillips.phill.data.entity.AttachmentEntity
+import com.phillips.phill.domain.extraction.ExtractionResult
+import com.phillips.phill.domain.extraction.MessageDataExtractor
 import java.io.File
 
 data class ConversationDetailUiState(
@@ -44,7 +49,8 @@ data class ConversationDetailUiState(
     val draftMessage: String = "",
     val isSending: Boolean = false,
     val sendError: String? = null,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val extractedData: ExtractionResult = ExtractionResult()
 )
 
 @HiltViewModel
@@ -112,9 +118,13 @@ class ConversationDetailViewModel @Inject constructor(
                 commsRepository.observeMessages(conversationId)
                     .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
                     .collect { messages ->
+                        val extracted = MessageDataExtractor.extractFromConversation(
+                            messages.filter { it.isInbound }.map { it.body }
+                        )
                         _uiState.value = _uiState.value.copy(
                             conversation = conversation,
                             messages = messages,
+                            extractedData = extracted,
                             isLoading = false
                         )
                     }
@@ -126,21 +136,25 @@ class ConversationDetailViewModel @Inject constructor(
      * Loads the full relational data flow for a linked conversation:
      * messages + active jobs count via combine.
      */
-    private suspend fun loadLinkedConversation(conversation: ConversationEntity, customer: CustomerEntity?) {
+    private fun loadLinkedConversation(conversation: ConversationEntity, customer: CustomerEntity?) {
         val custId = conversation.customerId ?: return
         combine(
             commsRepository.observeMessages(conversationId),
             jobRepository.observeByCustomer(custId)
         ) { messages, jobs ->
             val activeCount = jobs.count { it.status == JobStatus.EN_ROUTE || it.status == JobStatus.ON_SITE || it.status == JobStatus.SCHEDULED }
+            val extracted = MessageDataExtractor.extractFromConversation(
+                messages.filter { it.isInbound }.map { it.body }
+            )
             _uiState.value = _uiState.value.copy(
                 conversation = conversation,
                 customer = customer,
                 activeJobsCount = activeCount,
                 messages = messages,
+                extractedData = extracted,
                 isLoading = false
             )
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, Unit)
+        }.launchIn(viewModelScope)
     }
 
     fun updateDraft(text: String) {
@@ -261,6 +275,35 @@ class ConversationDetailViewModel @Inject constructor(
                         sendError = "Failed to share: ${e.message}"
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Add an extracted symptom as a note to the active job (or customer if no active job).
+     */
+    fun addSymptomNote(symptomText: String) {
+        val custId = _uiState.value.customer?.id ?: return
+        viewModelScope.launch {
+            try {
+                // Get current jobs via flow
+                val jobs = jobRepository.observeByCustomer(custId).first()
+                val activeJob = jobs.firstOrNull { it.status == JobStatus.EN_ROUTE || it.status == JobStatus.ON_SITE || it.status == JobStatus.SCHEDULED }
+                
+                if (activeJob != null) {
+                    val currentNotes = activeJob.notes ?: ""
+                    val newNotes = if (currentNotes.isBlank()) "Symptom: $symptomText" else "$currentNotes\nSymptom: $symptomText"
+                    jobRepository.saveJob(activeJob.copy(notes = newNotes))
+                } else {
+                    val customer = customerRepository.getCustomerById(custId)
+                    if (customer != null) {
+                        val currentNotes = customer.notes ?: ""
+                        val newNotes = if (currentNotes.isBlank()) "Symptom: $symptomText" else "$currentNotes\nSymptom: $symptomText"
+                        customerRepository.saveCustomer(customer.copy(notes = newNotes))
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore failure
             }
         }
     }

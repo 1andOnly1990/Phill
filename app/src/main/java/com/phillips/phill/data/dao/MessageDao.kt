@@ -20,6 +20,9 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getById(id: String): MessageEntity?
 
+    @Query("SELECT * FROM messages WHERE body LIKE '%' || :query || '%' ORDER BY timestamp_epoch DESC")
+    fun searchAll(query: String): Flow<List<MessageEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(message: MessageEntity): Long
 

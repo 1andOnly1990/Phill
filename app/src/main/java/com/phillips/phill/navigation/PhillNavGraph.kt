@@ -25,6 +25,8 @@ import com.phillips.phill.ui.dashboard.DashboardScreen
 import com.phillips.phill.ui.jobs.JobDetailScreen
 import com.phillips.phill.ui.jobs.JobQueueScreen
 import com.phillips.phill.ui.more.MoreHubScreen
+import com.phillips.phill.ui.reports.ProfitLossScreen
+import com.phillips.phill.ui.reports.TaxSummaryScreen
 import com.phillips.phill.ui.schedule.AppointmentFormScreen
 import com.phillips.phill.ui.schedule.ScheduleScreen
 import com.phillips.phill.ui.settings.ShopSettingsScreen
@@ -38,13 +40,15 @@ fun PhillNavGraph() {
             PhillBottomBar(
                 backStack = backStack,
                 onNavigate = { key ->
-                    // Clear to root and navigate to new tab
-                    while (backStack.size > 1) {
-                        backStack.removeLastOrNull()
-                    }
-                    if (backStack.lastOrNull() != key) {
-                        backStack.removeLastOrNull()
-                        backStack.add(key)
+                    // Clear to root and navigate to new tab atomically
+                    androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+                        while (backStack.size > 1) {
+                            backStack.removeLastOrNull()
+                        }
+                        if (backStack.lastOrNull() != key) {
+                            backStack.removeLastOrNull()
+                            backStack.add(key)
+                        }
                     }
                 }
             )
@@ -82,6 +86,8 @@ fun PhillNavGraph() {
                         onCustomers = { backStack.add(CustomerListKey) },
                         onBilling = { backStack.add(BillingKey) },
                         onAnalytics = { backStack.add(AnalyticsKey) },
+                        onProfitLoss = { backStack.add(ProfitLossKey) },
+                        onTaxSummary = { backStack.add(TaxSummaryKey) },
                         onSettings = { backStack.add(ShopSettingsKey) }
                     )
                 }
@@ -116,6 +122,16 @@ fun PhillNavGraph() {
                         onNavigateBack = { backStack.removeLastOrNull() }
                     )
                 }
+                entry<ProfitLossKey> {
+                    ProfitLossScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() }
+                    )
+                }
+                entry<TaxSummaryKey> {
+                    TaxSummaryScreen(
+                        onNavigateBack = { backStack.removeLastOrNull() }
+                    )
+                }
 
                 // --- Detail screens ---
                 entry<CustomerDetailKey> { key ->
@@ -139,6 +155,8 @@ fun PhillNavGraph() {
                     CustomerFormScreen(
                         customerId = key.customerId,
                         initialPhone = key.initialPhone,
+                        initialFirstName = key.initialFirstName,
+                        initialLastName = key.initialLastName,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onSaveSuccess = { customerId ->
                             // Pop form and navigate to detail
@@ -151,6 +169,9 @@ fun PhillNavGraph() {
                     VehicleFormScreen(
                         customerId = key.customerId,
                         vehicleId = key.vehicleId,
+                        initialYear = key.initialYear,
+                        initialMake = key.initialMake,
+                        initialModel = key.initialModel,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         onSaveSuccess = {
                             backStack.removeLastOrNull()
@@ -191,8 +212,24 @@ fun PhillNavGraph() {
                     ConversationDetailScreen(
                         conversationId = key.conversationId,
                         onNavigateBack = { backStack.removeLastOrNull() },
-                        onCreateCustomer = { phone -> backStack.add(CustomerFormKey(initialPhone = phone)) },
-                        onScheduleAppointment = { customerId -> backStack.add(AppointmentFormKey(initialCustomerId = customerId)) }
+                        onCreateCustomer = { phone, firstName, lastName ->
+                            backStack.add(CustomerFormKey(
+                                initialPhone = phone,
+                                initialFirstName = firstName,
+                                initialLastName = lastName
+                            ))
+                        },
+                        onScheduleAppointment = { customerId ->
+                            backStack.add(AppointmentFormKey(initialCustomerId = customerId))
+                        },
+                        onAddVehicle = { customerId, year, make, model ->
+                            backStack.add(VehicleFormKey(
+                                customerId = customerId,
+                                initialYear = year,
+                                initialMake = make,
+                                initialModel = model
+                            ))
+                        }
                     )
                 }
                 entry<ExpenseFormKey> { key ->

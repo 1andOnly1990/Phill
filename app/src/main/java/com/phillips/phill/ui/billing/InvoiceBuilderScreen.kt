@@ -110,6 +110,9 @@ fun InvoiceBuilderScreen(
             state.lineItems.forEachIndexed { index, item ->
                 LineItemCard(
                     item = item,
+                    partsMarkupMode = state.partsMarkupMode,
+                    partsMarkupBasisPoints = state.partsMarkupBasisPoints,
+                    markupTiers = state.markupTiers,
                     onUpdate = { updated -> viewModel.updateLineItem(index, updated) },
                     onRemove = { viewModel.removeLineItem(index) }
                 )
@@ -233,6 +236,9 @@ fun InvoiceBuilderScreen(
 @Composable
 private fun LineItemCard(
     item: LineItemUiModel,
+    partsMarkupMode: String = "SLIDING",
+    partsMarkupBasisPoints: Int = 14000,
+    markupTiers: List<com.phillips.phill.domain.billing.MarkupTier> = BillingEngine.DEFAULT_MARKUP_TIERS,
     onUpdate: (LineItemUiModel) -> Unit,
     onRemove: () -> Unit
 ) {
@@ -309,20 +315,22 @@ private fun LineItemCard(
                 )
             }
 
-            // Show calculated total for this line
+            // Show calculated total for this line — uses actual shop markup settings
             val qty = BillingEngine.parseHoursToThousandths(item.quantityDisplay) ?: 0L
             val price = BillingEngine.parseDollarsToCents(item.unitPriceDisplay) ?: 0L
-            val total = BillingEngine.calculateLineItemTotal(qty, price)
-            val displayTotal = if (item.type == LineItemType.PARTS) {
-                // Show marked-up price for parts
-                val markup = 14000 // Will be overridden by actual value in ViewModel
-                BillingEngine.formatCents(total)
+            val effectivePrice = if (item.type == LineItemType.PARTS) {
+                if (partsMarkupMode == "SLIDING") {
+                    BillingEngine.applySlidingScaleMarkup(price, markupTiers)
+                } else {
+                    BillingEngine.applyPartsMarkup(price, partsMarkupBasisPoints)
+                }
             } else {
-                BillingEngine.formatCents(total)
+                price
             }
+            val total = BillingEngine.calculateLineItemTotal(qty, effectivePrice)
 
             Text(
-                "Line total: $displayTotal",
+                "Line total: ${BillingEngine.formatCents(total)}",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.End)

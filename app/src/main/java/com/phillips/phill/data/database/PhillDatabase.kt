@@ -51,7 +51,7 @@ import com.phillips.phill.data.entity.AttachmentEntity
         ShopProfileEntity::class,
         AttachmentEntity::class
     ],
-    version = 4,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -122,6 +122,57 @@ abstract class PhillDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_conversation_id ON attachments(conversation_id)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_message_id ON attachments(message_id)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_job_id ON attachments(job_id)")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // SQLite can't add FKs via ALTER TABLE — must recreate
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS conversations_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        customer_id TEXT DEFAULT NULL,
+                        phone_number TEXT NOT NULL,
+                        display_name TEXT DEFAULT NULL,
+                        last_message_epoch INTEGER DEFAULT NULL,
+                        unread_count INTEGER NOT NULL DEFAULT 0,
+                        source TEXT NOT NULL DEFAULT 'SMS',
+                        needs_review INTEGER NOT NULL DEFAULT 0,
+                        last_auto_reply_epoch INTEGER DEFAULT NULL,
+                        job_id TEXT DEFAULT NULL,
+                        appointment_id TEXT DEFAULT NULL,
+                        FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
+                        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL,
+                        FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO conversations_new (id, customer_id, phone_number, display_name, 
+                        last_message_epoch, unread_count, source, needs_review, last_auto_reply_epoch)
+                    SELECT id, customer_id, phone_number, display_name,
+                        last_message_epoch, unread_count, source, needs_review, last_auto_reply_epoch
+                    FROM conversations
+                """.trimIndent())
+                db.execSQL("DROP TABLE conversations")
+                db.execSQL("ALTER TABLE conversations_new RENAME TO conversations")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_customer_id ON conversations(customer_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_phone_number ON conversations(phone_number)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_job_id ON conversations(job_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_appointment_id ON conversations(appointment_id)")
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE shop_profile ADD COLUMN parts_markup_mode TEXT NOT NULL DEFAULT 'SLIDING'")
+                db.execSQL("ALTER TABLE shop_profile ADD COLUMN markup_tiers_json TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE shop_profile ADD COLUMN mileage_rate_cents INTEGER NOT NULL DEFAULT 70")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE expenses ADD COLUMN receipt_uri TEXT DEFAULT NULL")
             }
         }
     }

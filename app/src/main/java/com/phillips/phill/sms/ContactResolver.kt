@@ -66,4 +66,36 @@ class ContactResolver @Inject constructor(
             }
         }
     }
+
+    /**
+     * Reverse-lookup: given a display name, find a matching phone number.
+     * Used when Google Messages replaces a phone number with a caller-ID name
+     * and we need to resolve back to the real phone.
+     *
+     * Searches contacts where DISPLAY_NAME matches (case-insensitive).
+     * Returns the first phone number found, or null.
+     */
+    fun getPhoneForName(displayName: String): String? {
+        if (displayName.isBlank()) return null
+
+        val cursor = try {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} = ?",
+                arrayOf(displayName),
+                null
+            )
+        } catch (e: Exception) {
+            return null
+        }
+
+        return cursor?.use {
+            if (it.moveToFirst()) {
+                it.getString(it.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER))
+            } else {
+                null
+            }
+        }
+    }
 }

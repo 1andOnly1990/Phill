@@ -83,6 +83,11 @@ fun AnalyticsScreen(
                     MetricRow("Today", "%.1f mi".format(state.todayMiles))
                     MetricRow("This Week", "%.1f mi".format(state.weekMiles))
                     MetricRow("This Month", "%.1f mi".format(state.monthMiles))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    MetricRow(
+                        "IRS Deduction ($${String.format("%.2f", state.mileageRateCentsPerMile / 100.0)}/mi)",
+                        BillingEngine.formatCents(state.mileageDeductionCents)
+                    )
                 }
             }
 
